@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(curl -s http://127.0.0.1:3457/)",
+      "Bash(curl -s http://127.0.0.1:3457/blog/guia-completa-iptv-espana-2026)",
+      "Bash(grep -E \"ƒ|○|●|/\\\\[locale\\\\]|Error|error|✓|Revalidat|Failed\")",
+      "Bash(grep -E \"Revalidate|Expire|/\\\\[locale\\\\]|Error|Type error|✓|✗|Failed\")",
+      "Bash(curl -s http://127.0.0.1:3458/privacy-policy)",
+      "Bash(curl -s http://127.0.0.1:3458/blog/guia-completa-iptv-espana-2026)",
+      "Bash(curl -s http://127.0.0.1:3458/)"
+    ]
+  }
+}
