@@ -41,3 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# Local databases
+dev.db
+dev.db.bak
+prisma/dev.db
+
+# Task ledger (runtime data)
+task-ledger/
