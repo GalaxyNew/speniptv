@@ -83,6 +83,7 @@ conn.on('ready', async () => {
     await executeCommand(conn, `cd ${appDir} && npx tsx scripts/seed-blog-subpage.ts`);
     await executeCommand(conn, `cd ${appDir} && npx tsx scripts/update-prod-domain.ts`);
     await executeCommand(conn, `cd ${appDir} && npx tsx scripts/add-blog-post-smarters.ts`);
+    await executeCommand(conn, `cd ${appDir} && npx tsx scripts/add-blog-post-config.ts`);
 
     // 4. Restart PM2
     console.log('--- Step 4: Restarting PM2 process ---');
