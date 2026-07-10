@@ -7,8 +7,6 @@ import { usePathname } from 'next/navigation'
 
 const navItems = [
   { href: '/admin', label: '📊 仪表盘', exact: true },
-  { href: '/admin/projects', label: '📋 项目任务板' },
-  { href: '/admin/release', label: '🚀 发布中心' },
   { href: '/admin/modules', label: '📦 模块管理' },
   { href: '/admin/content', label: '✏️ 内容编辑' },
   { href: '/admin/subpages', label: '📄 页面管理' },

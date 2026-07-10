@@ -149,11 +149,11 @@ export async function proxy(request: NextRequest) {
 
   // 1. Enforce clean URL: if user visits explicit DEFAULT_LOCALE path, redirect to prefix-free path
   if (pathname === `/${targetLocale}`) {
-    return NextResponse.redirect(new URL('/', request.url))
+    return NextResponse.redirect(new URL('/', request.url), 301)
   }
   if (pathname.startsWith(`/${targetLocale}/`)) {
     const cleanPath = pathname.substring(targetLocale.length + 1)
-    return NextResponse.redirect(new URL(cleanPath, request.url))
+    return NextResponse.redirect(new URL(cleanPath, request.url), 301)
   }
 
   // 2. Check if pathname has another active locale prefix (e.g. /fr/..., /en/..., /zh/...)
