@@ -47,15 +47,23 @@ export default function AccountManagementPage() {
 
       setAccounts(accData)
       setRoles(roleData)
-    } catch (err: any) {
-      setError(err.message || '加载数据出错，请稍后重试')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载数据出错，请稍后重试')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchData()
+    let active = true
+    Promise.resolve().then(() => {
+      if (active) {
+        fetchData()
+      }
+    })
+    return () => {
+      active = false
+    }
   }, [fetchData])
 
   const openAdd = () => {
@@ -113,8 +121,8 @@ export default function AccountManagementPage() {
       setMessage(editingId ? '账号更新成功！' : '账号创建成功！')
       setShowForm(false)
       fetchData()
-    } catch (err: any) {
-      setError(err.message || '操作失败')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '操作失败')
     } finally {
       setSaving(false)
     }
@@ -139,8 +147,8 @@ export default function AccountManagementPage() {
       }
       setMessage(`账号 "${username}" 已成功删除！`)
       fetchData()
-    } catch (err: any) {
-      setError(err.message || '删除账号失败')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '删除账号失败')
     }
   }
 
@@ -223,23 +231,23 @@ export default function AccountManagementPage() {
                       {new Date(acc.createdAt).toLocaleString('zh-CN')}
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {acc.username !== 'admin' && (
-                        <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => openEdit(acc)}
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              borderRadius: 8,
-                              border: '1px solid rgba(34,211,238,0.4)',
-                              background: 'rgba(34,211,238,0.1)',
-                              color: '#22d3ee',
-                              fontWeight: 700,
-                              fontSize: '0.8rem',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            编辑
-                          </button>
+                      <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => openEdit(acc)}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: 8,
+                            border: '1px solid rgba(34,211,238,0.4)',
+                            background: 'rgba(34,211,238,0.1)',
+                            color: '#22d3ee',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          编辑
+                        </button>
+                        {acc.username !== 'admin' && (
                           <button
                             onClick={() => handleDelete(acc.id, acc.username)}
                             style={{
@@ -255,8 +263,8 @@ export default function AccountManagementPage() {
                           >
                             删除
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -295,10 +303,13 @@ export default function AccountManagementPage() {
                   value={usernameInput}
                   onChange={e => setUsernameInput(e.target.value)}
                   placeholder="请输入后台登录用户名"
+                  disabled={editingId !== null && usernameInput === 'admin'}
                   style={{
                     width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                     background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
                     outline: 'none', boxSizing: 'border-box',
+                    opacity: (editingId !== null && usernameInput === 'admin') ? 0.6 : 1,
+                    cursor: (editingId !== null && usernameInput === 'admin') ? 'not-allowed' : 'text',
                   }}
                 />
               </div>
@@ -325,16 +336,25 @@ export default function AccountManagementPage() {
                 <select
                   value={roleIdInput}
                   onChange={e => setRoleIdInput(e.target.value)}
+                  disabled={editingId !== null && usernameInput === 'admin'}
                   style={{
                     width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                     background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                    outline: 'none', cursor: 'pointer', boxSizing: 'border-box',
+                    outline: 'none', boxSizing: 'border-box',
+                    opacity: (editingId !== null && usernameInput === 'admin') ? 0.6 : 1,
+                    cursor: (editingId !== null && usernameInput === 'admin') ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  <option value="">未分配 (没有任何权限)</option>
-                  {roles.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
+                  {editingId !== null && usernameInput === 'admin' ? (
+                    <option value="">所有权限 (admin)</option>
+                  ) : (
+                    <>
+                      <option value="">未分配 (没有任何权限)</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
               </div>
             </div>
