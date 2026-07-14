@@ -1,17 +1,33 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { searchParams } = new URL(req.url)
   const locale = searchParams.get('locale')
+  const deletedOnly = searchParams.get('deleted') === 'true'
+
+  // Recycle bin query requires recycle-bin access (only admin)
+  if (deletedOnly) {
+    const permission = await verifyPermission('recycle-bin', 'readonly')
+    if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
+  } else {
+    const permission = await verifyPermission('blog-posts', 'readonly')
+    if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
+  }
+
+  const now = new Date()
+  // Auto-publish past scheduled posts
+  await db.blogPost.updateMany({
+    where: { status: 'scheduled', publishAt: { lte: now } },
+    data: { status: 'published' }
+  })
 
   const posts = await db.blogPost.findMany({
-    where: locale ? { locale } : undefined,
+    where: {
+      isDeleted: deletedOnly,
+      ...(locale ? { locale } : {}),
+    },
     include: { template: { select: { name: true } } },
     orderBy: { createdAt: 'desc' },
   })
@@ -19,8 +35,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-posts', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const data = await req.json()
   const {
@@ -37,6 +53,7 @@ export async function POST(req: Request) {
     robots = 'index, follow',
     keywords = '',
     templateId = null,
+    anchorNavEnabled = true,
   } = data
 
   if (!title || !slug || !locale || !category || content === undefined) {
@@ -76,7 +93,8 @@ export async function POST(req: Request) {
       canonicalUrl,
       robots,
       keywords,
-      templateId,
+      ...(templateId && { template: { connect: { id: templateId } } }),
+      anchorNavEnabled,
     },
   })
   return NextResponse.json(post, { status: 201 })

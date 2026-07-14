@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 interface Settings {
   defaultLocale: string
@@ -13,6 +14,7 @@ const locales = [
 ]
 
 export default function SettingsPage() {
+  const { showPermissionAlert } = usePermission()
   const [settings, setSettings] = useState<Partial<Settings>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,14 +40,26 @@ export default function SettingsPage() {
 
   const save = async () => {
     setSaving(true)
-    await fetch('/api/admin/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      if (res.status === 403) {
+        showPermissionAlert()
+      } else if (!res.ok) {
+        alert('保存失败，请重试')
+      } else {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('保存失败，请重试')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const field = (key: keyof Settings, label: string, type = 'text', placeholder = '') => (

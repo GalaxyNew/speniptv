@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 interface PageSeo {
   locale: string
@@ -36,6 +37,7 @@ interface SiteSettings {
 }
 
 export default function SeoPage() {
+  const { showPermissionAlert } = usePermission()
   const [activeTab, setActiveTab] = useState<'meta' | 'schema' | 'crawler'>('meta')
   const [activeLocale, setActiveLocale] = useState<'es'>('es')
   const [data, setData] = useState<Partial<PageSeo>>({})
@@ -95,20 +97,21 @@ export default function SeoPage() {
   const save = async () => {
     setSaving(true)
     try {
+      let res;
       if (activeTab === 'meta') {
-        await fetch('/api/admin/seo', {
+        res = await fetch('/api/admin/seo', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ locale: activeLocale, ...data }),
         })
       } else if (activeTab === 'schema') {
-        await fetch('/api/admin/seo/schema', {
+        res = await fetch('/api/admin/seo/schema', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...schemaData, id: activeLocale }),
         })
       } else if (activeTab === 'crawler') {
-        await Promise.all([
+        const results = await Promise.all([
           fetch('/api/admin/settings', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -120,7 +123,27 @@ export default function SeoPage() {
             body: JSON.stringify({ locale: activeLocale, ...personalizedData }),
           })
         ])
+        if (results.some(r => r.status === 403)) {
+          showPermissionAlert()
+          return
+        }
+        if (results.some(r => !r.ok)) {
+          alert('保存失败，请重试')
+          return
+        }
       }
+
+      if (res) {
+        if (res.status === 403) {
+          showPermissionAlert()
+          return
+        }
+        if (!res.ok) {
+          alert('保存失败，请重试')
+          return
+        }
+      }
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {

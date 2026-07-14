@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 interface Params { params: Promise<{ id: string }> }
 
 export async function GET(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('subpages', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const subpage = await db.subpage.findUnique({
@@ -21,8 +20,8 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('subpages', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const data = await req.json()
@@ -84,8 +83,8 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('subpages', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const current = await db.subpage.findUnique({ where: { id } })

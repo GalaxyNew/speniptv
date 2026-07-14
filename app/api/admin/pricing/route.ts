@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 // GET all tiers with plans and labels
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('pricing', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const [tiers, pricingSettings] = await Promise.all([
     db.pricingTier.findMany({
@@ -37,8 +36,8 @@ export async function GET() {
 
 // PATCH update a plan field or plan label field
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('pricing', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const body = await req.json()
 

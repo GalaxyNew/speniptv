@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 interface Module {
   id: string
@@ -39,6 +40,7 @@ const moduleNames: Record<string, string> = {
 const localeLabels = { fr: '🇫🇷 法语', es: '🇪🇸 西班牙语', en: '🇬🇧 英语', zh: '🇨🇳 中文' }
 
 export default function ModulesPage() {
+  const { showPermissionAlert } = usePermission()
   const [modules, setModules] = useState<Module[]>([])
   const [activeLocale, setActiveLocale] = useState<'es'>('es')
   const [saving, setSaving] = useState<string | null>(null)
@@ -80,12 +82,25 @@ export default function ModulesPage() {
       return { ...m, isVisible_es: isVisible }
     }))
 
-    await fetch('/api/admin/modules', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, locale: activeLocale, isVisible }),
-    })
-    setSaving(null)
+    try {
+      const res = await fetch('/api/admin/modules', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, locale: activeLocale, isVisible }),
+      })
+      if (res.status === 403) {
+        showPermissionAlert()
+        loadModules(activeLocale)
+      } else if (!res.ok) {
+        alert('操作失败，请重试')
+        loadModules(activeLocale)
+      }
+    } catch (e) {
+      alert('操作失败，请重试')
+      loadModules(activeLocale)
+    } finally {
+      setSaving(null)
+    }
   }
 
   const moveModule = async (index: number, direction: 'up' | 'down') => {
@@ -124,7 +139,16 @@ export default function ModulesPage() {
     }).filter(Boolean) as Promise<Response>[]
 
     if (promises.length > 0) {
-      await Promise.all(promises)
+      try {
+        const results = await Promise.all(promises)
+        if (results.some(r => r.status === 403)) {
+          showPermissionAlert()
+        } else if (results.some(r => !r.ok)) {
+          alert('操作失败，请重试')
+        }
+      } catch (e) {
+        alert('操作失败，请重试')
+      }
     }
     loadModules(activeLocale)
   }

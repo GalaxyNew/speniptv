@@ -12,7 +12,7 @@ export const revalidate = 60
 // post) still render on-demand and get cached, thanks to default dynamicParams.
 export async function generateStaticParams() {
   const posts = await db.blogPost.findMany({
-    where: { locale: 'es', status: 'published' },
+    where: { locale: 'es', status: 'published', isDeleted: false },
     select: { slug: true },
   })
   return posts.map((p) => ({ locale: 'es', slug: p.slug }))
@@ -86,7 +86,8 @@ function processAnchorsAndExtractToc(html: string): { processedHtml: string; toc
         
         let headingText = ''
         let lookahead = i + 1
-        while (lookahead < tokens.length && !tokens[lookahead].startsWith('<')) {
+        const closingTag = `</${match[1]}>`.toLowerCase()
+        while (lookahead < tokens.length && tokens[lookahead].toLowerCase() !== closingTag) {
           headingText += tokens[lookahead]
           lookahead++
         }
@@ -119,12 +120,18 @@ export async function generateMetadata({ params }: SubpageProps): Promise<Metada
   const { locale, slug } = await params
   const now = new Date()
 
+  // Auto-publish past scheduled posts
+  await db.blogPost.updateMany({
+    where: { status: 'scheduled', publishAt: { lte: now } },
+    data: { status: 'published' }
+  })
+
   const post = await db.blogPost.findUnique({
     where: { locale_slug: { locale, slug } }
   })
 
   // Enforce visibility
-  if (!post) return {}
+  if (!post || post.isDeleted) return {}
   const isScheduledNotYetPublished = post.status === 'scheduled' && new Date(post.publishAt) > now
   if (post.status === 'draft' || isScheduledNotYetPublished) return {}
 
@@ -184,13 +191,19 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
   const { locale, slug } = await params
   const now = new Date()
 
+  // Auto-publish past scheduled posts
+  await db.blogPost.updateMany({
+    where: { status: 'scheduled', publishAt: { lte: now } },
+    data: { status: 'published' }
+  })
+
   // 1. Fetch Post and Template details
   const post = await db.blogPost.findUnique({
     where: { locale_slug: { locale, slug } },
     include: { template: true }
   })
 
-  if (!post) {
+  if (!post || post.isDeleted) {
     notFound()
   }
 
@@ -273,7 +286,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
   renderedContent = injectKeywordLinks(renderedContent, keywordLinksMap)
 
   // Anchor generation & Table of Contents extraction
-  const enableToc = post.template ? post.template.anchorNavEnabled : true
+  const enableToc = post.template?.anchorNavEnabled ?? false
   const { processedHtml, toc } = processAnchorsAndExtractToc(renderedContent)
   renderedContent = processedHtml
 
@@ -288,6 +301,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
         locale,
         category: post.category,
         id: { not: post.id },
+        isDeleted: false,
         OR: [
           { status: 'published' },
           { status: 'scheduled', publishAt: { lte: now } }
@@ -301,6 +315,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
       where: {
         locale,
         id: { not: post.id },
+        isDeleted: false,
         OR: [
           { status: 'published' },
           { status: 'scheduled', publishAt: { lte: now } }
@@ -316,6 +331,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
     where: {
       locale,
       publishAt: { lt: post.publishAt },
+      isDeleted: false,
       OR: [
         { status: 'published' },
         { status: 'scheduled', publishAt: { lte: now } }
@@ -328,6 +344,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
     where: {
       locale,
       publishAt: { gt: post.publishAt },
+      isDeleted: false,
       OR: [
         { status: 'published' },
         { status: 'scheduled', publishAt: { lte: now } }
@@ -524,17 +541,20 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
             {/* Post Header Hero */}
             <div className="blog-article-header">
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                <span style={{
-                  padding: '0.25rem 0.75rem',
-                  borderRadius: 99,
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  background: 'var(--badge-bg, rgba(34, 211, 238, 0.1))',
-                  color: 'var(--accent-1, #22d3ee)',
-                  border: '1px solid rgba(34, 211, 238, 0.2)'
-                }}>
-                  {catLabel}
-                </span>
+                <Link href={publicPath(locale, `/blog?category=${post.category}`)} style={{ textDecoration: 'none' }}>
+                  <span style={{
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: 99,
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    background: 'var(--badge-bg, rgba(34, 211, 238, 0.1))',
+                    color: 'var(--accent-1, #22d3ee)',
+                    border: '1px solid rgba(34, 211, 238, 0.2)',
+                    cursor: 'pointer'
+                  }}>
+                    {catLabel}
+                  </span>
+                </Link>
                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{formattedPublishDate}</span>
               </div>
               

@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 interface Params { params: Promise<{ id: string }> }
 
 export async function GET(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-posts', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const post = await db.blogPost.findUnique({
@@ -22,11 +21,20 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { id } = await params
   const data = await req.json()
+  
+  const permission = await verifyPermission('blog-posts', 'edit')
+  let isAuthorized = permission.authorized
+  
+  if (!isAuthorized && data.isDeleted === false) {
+    const recyclePermission = await verifyPermission('recycle-bin', 'edit')
+    isAuthorized = recyclePermission.authorized
+  }
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
   const {
     title,
     slug,
@@ -41,6 +49,7 @@ export async function PATCH(req: Request, { params }: Params) {
     robots,
     keywords,
     templateId,
+    anchorNavEnabled,
   } = data
 
   const current = await db.blogPost.findUnique({ where: { id } })
@@ -85,7 +94,12 @@ export async function PATCH(req: Request, { params }: Params) {
       ...(canonicalUrl !== undefined && { canonicalUrl }),
       ...(robots !== undefined && { robots }),
       ...(keywords !== undefined && { keywords }),
-      ...(templateId !== undefined && { templateId }),
+      ...(templateId !== undefined && {
+        template: templateId ? { connect: { id: templateId } } : { disconnect: true }
+      }),
+      ...(anchorNavEnabled !== undefined && { anchorNavEnabled }),
+      ...(data.isDeleted !== undefined && { isDeleted: Boolean(data.isDeleted) }),
+      ...(data.isDeleted !== undefined && { deletedAt: data.isDeleted ? new Date() : null }),
     },
   })
 
@@ -93,8 +107,16 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { searchParams } = new URL(req.url)
+  const permanent = searchParams.get('permanent') === 'true'
+
+  if (permanent) {
+    const permission = await verifyPermission('recycle-bin', 'edit')
+    if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
+  } else {
+    const permission = await verifyPermission('blog-posts', 'edit')
+    if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
+  }
 
   const { id } = await params
   const current = await db.blogPost.findUnique({ where: { id } })
@@ -102,6 +124,13 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: 'Blog post not found' }, { status: 404 })
   }
 
-  await db.blogPost.delete({ where: { id } })
+  if (permanent) {
+    await db.blogPost.delete({ where: { id } })
+  } else {
+    await db.blogPost.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    })
+  }
   return NextResponse.json({ ok: true })
 }

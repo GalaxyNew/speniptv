@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 // PATCH /api/admin/content — save one content field
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('content', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { moduleId, locale, key, value } = await req.json()
   if (!moduleId || !locale || !key || value === undefined) {
@@ -31,8 +30,8 @@ export async function PATCH(req: Request) {
 
 // GET /api/admin/content?moduleId=hero&locale=fr
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('content', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { searchParams } = new URL(req.url)
   const moduleId = searchParams.get('moduleId')

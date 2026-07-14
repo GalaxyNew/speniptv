@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
+
 
 interface PersonalizedSettings {
   id: string
@@ -41,6 +43,7 @@ const fonts = [
 ]
 
 export default function PersonalizedPage() {
+  const { showPermissionAlert } = usePermission()
   const [activeLocale, setActiveLocale] = useState<'es'>('es')
   const [settings, setSettings] = useState<Partial<PersonalizedSettings>>({})
   const [loading, setLoading] = useState(true)
@@ -65,13 +68,19 @@ export default function PersonalizedPage() {
   const save = async () => {
     setSaving(true)
     try {
-      await fetch('/api/admin/personalized', {
+      const res = await fetch('/api/admin/personalized', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ locale: activeLocale, ...settings }),
       })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      if (res.status === 403) {
+        showPermissionAlert()
+      } else if (!res.ok) {
+        alert('保存失败，请重试')
+      } else {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+      }
     } catch (err) {
       console.error(err)
       alert('保存失败，请重试')

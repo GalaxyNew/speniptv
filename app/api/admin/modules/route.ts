@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 // GET all modules
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('modules', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const modules = await db.pageModule.findMany({ orderBy: { sortOrder: 'asc' } })
   return NextResponse.json(modules)
@@ -14,8 +13,8 @@ export async function GET() {
 
 // PATCH update visibility or sortOrder
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('modules', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id, locale, isVisible, sortOrder } = await req.json()
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })

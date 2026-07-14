@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 import EditableText from '@/components/frontend/EditableText'
 import EditableIcon from '@/components/frontend/EditableIcon'
 import EditableImage from '@/components/frontend/EditableImage'
@@ -200,6 +201,7 @@ const getFieldLabel = (moduleId: string, key: string): string => {
 }
 
 export default function ContentEditorPage() {
+  const { showPermissionAlert } = usePermission()
   const [activeModule, setActiveModule] = useState<string>('hero')
   const [activeLocale, setActiveLocale] = useState<'es'>('es')
   const [fields, setFields] = useState<ContentField[]>([])
@@ -423,22 +425,36 @@ export default function ContentEditorPage() {
 
   const saveField = async (key: string, value: string) => {
     setSaving(key)
-    await fetch('/api/admin/content', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ moduleId: activeModule, locale: activeLocale, key, value }),
-    })
-    setSaving(null)
-    setSaved(key)
-    setTimeout(() => setSaved(null), 2000)
-    setFields(prev => {
-      const exists = prev.some(f => f.key === key)
-      if (exists) {
-        return prev.map(f => f.key === key ? { ...f, value } : f)
-      } else {
-        return [...prev, { moduleId: activeModule, locale: activeLocale, key, value }]
+    try {
+      const res = await fetch('/api/admin/content', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleId: activeModule, locale: activeLocale, key, value }),
+      })
+      if (res.status === 403) {
+        showPermissionAlert()
+        return
       }
-    })
+      if (!res.ok) {
+        alert('保存失败，请重试')
+        return
+      }
+      setSaved(key)
+      setTimeout(() => setSaved(null), 2000)
+      setFields(prev => {
+        const exists = prev.some(f => f.key === key)
+        if (exists) {
+          return prev.map(f => f.key === key ? { ...f, value } : f)
+        } else {
+          return [...prev, { moduleId: activeModule, locale: activeLocale, key, value }]
+        }
+      })
+    } catch (err) {
+      console.error(err)
+      alert('保存失败，请重试')
+    } finally {
+      setSaving(null)
+    }
   }
 
   const updateLocalField = (key: string, value: string) => {
@@ -571,6 +587,7 @@ export default function ContentEditorPage() {
         multiline={isTextArea}
         placeholder={defaultPlaceholder}
         onSave={handleSave}
+        onPermissionDenied={showPermissionAlert}
       >
         {val}
       </EditableText>
@@ -968,6 +985,7 @@ export default function ContentEditorPage() {
                       defaultSize={24}
                       defaultColor={i % 2 === 0 ? "var(--accent-1)" : "var(--accent-2)"}
                       isEditMode={true}
+                      onPermissionDenied={showPermissionAlert}
                     />
                   </div>
                   {renderEditableInput(`${key}_title`, { fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.875rem', fontFamily: 'Outfit, sans-serif' })}
@@ -1058,6 +1076,7 @@ export default function ContentEditorPage() {
                       defaultSize={32}
                       defaultColor={idx % 2 === 0 ? 'var(--accent-1)' : 'var(--accent-2)'}
                       isEditMode={true}
+                      onPermissionDenied={showPermissionAlert}
                     />
                   </div>
 
@@ -1289,6 +1308,7 @@ export default function ContentEditorPage() {
                       defaultSize={24}
                       defaultColor={i % 2 === 0 ? 'var(--accent-1)' : 'var(--accent-2)'}
                       isEditMode={true}
+                      onPermissionDenied={showPermissionAlert}
                     />
                   </div>
                 {renderEditableInput(key, { fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center', marginTop: '0.25rem' })}
@@ -1414,6 +1434,7 @@ export default function ContentEditorPage() {
                     defaultSize={24}
                     defaultColor={svc.defaultColor}
                     isEditMode={true}
+                    onPermissionDenied={showPermissionAlert}
                   />
                 </div>
                 <div style={{ marginBottom: '0.375rem', width: '100%' }}>

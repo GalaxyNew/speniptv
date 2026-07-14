@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
+
 
 interface PlanLabel {
   id: string
@@ -30,6 +32,7 @@ interface Tier {
 }
 
 export default function PricingPage() {
+  const { showPermissionAlert } = usePermission()
   const [tiers, setTiers] = useState<Tier[]>([])
   const [settings, setSettings] = useState({ display_devices: '1,2,3', display_months: '1,3,6,12' })
   const [activeLocale, setActiveLocale] = useState<'es'>('es')
@@ -51,14 +54,26 @@ export default function PricingPage() {
 
   const savePlanLabel = async (labelId: string, field: string, value: any) => {
     setSaving(labelId + field)
-    await fetch('/api/admin/pricing', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planLabelId: labelId, field, value }),
-    })
-    setSaved(labelId + field)
-    setTimeout(() => setSaved(null), 2000)
-    setSaving(null)
+    try {
+      const res = await fetch('/api/admin/pricing', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planLabelId: labelId, field, value }),
+      })
+      if (res.status === 403) {
+        showPermissionAlert()
+      } else if (!res.ok) {
+        alert('保存失败，请重试')
+      } else {
+        setSaved(labelId + field)
+        setTimeout(() => setSaved(null), 2000)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('保存失败，请重试')
+    } finally {
+      setSaving(null)
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -130,11 +145,18 @@ export default function PricingPage() {
                       if (devices.length === 0) devices = [String(dev)]
                       const newVal = devices.sort().join(',')
                       setSettings(s => ({ ...s, display_devices: newVal }))
-                      await fetch('/api/admin/pricing', {
+                      const res = await fetch('/api/admin/pricing', {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ settingKey: 'display_devices', value: newVal })
                       })
+                      if (res.status === 403) {
+                        showPermissionAlert()
+                        setSettings(s => ({ ...s, display_devices: settings.display_devices }))
+                      } else if (!res.ok) {
+                        alert('保存失败，请重试')
+                        setSettings(s => ({ ...s, display_devices: settings.display_devices }))
+                      }
                     }}
                   />
                   {dev} 台设备
@@ -166,11 +188,18 @@ export default function PricingPage() {
                       if (months.length === 0) months = [String(mon)]
                       const newVal = months.map(Number).sort((a,b) => a-b).join(',')
                       setSettings(s => ({ ...s, display_months: newVal }))
-                      await fetch('/api/admin/pricing', {
+                      const res = await fetch('/api/admin/pricing', {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ settingKey: 'display_months', value: newVal })
                       })
+                      if (res.status === 403) {
+                        showPermissionAlert()
+                        setSettings(s => ({ ...s, display_months: settings.display_months }))
+                      } else if (!res.ok) {
+                        alert('保存失败，请重试')
+                        setSettings(s => ({ ...s, display_months: settings.display_months }))
+                      }
                     }}
                   />
                   {mon} 个月

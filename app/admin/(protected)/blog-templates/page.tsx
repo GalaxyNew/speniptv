@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 interface BlogTemplate {
   id: string
@@ -11,6 +12,7 @@ interface BlogTemplate {
   recommendationsType: string
   recommendationsCount: number
   keywordLinks: string
+  isDefault?: boolean
   createdAt: string
   updatedAt: string
 }
@@ -23,14 +25,17 @@ const emptyForm = {
   recommendationsType: 'latest',
   recommendationsCount: 3,
   keywordLinksText: '', // for text UI editing (e.g. "Keyword | Url")
+  isDefault: false,
 }
 
 export default function BlogTemplatesPage() {
+  const { showPermissionAlert } = usePermission()
   const [templates, setTemplates] = useState<BlogTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [previewTpl, setPreviewTpl] = useState<BlogTemplate | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
 
@@ -80,6 +85,7 @@ export default function BlogTemplatesPage() {
       recommendationsType: tpl.recommendationsType,
       recommendationsCount: tpl.recommendationsCount,
       keywordLinksText,
+      isDefault: tpl.isDefault || false,
     })
     setError('')
     setShowForm(true)
@@ -120,6 +126,7 @@ export default function BlogTemplatesPage() {
         recommendationsType: form.recommendationsType,
         recommendationsCount: form.recommendationsCount,
         keywordLinks,
+        isDefault: form.isDefault,
       }
 
       const res = await fetch(url, {
@@ -129,6 +136,9 @@ export default function BlogTemplatesPage() {
       })
       
       const resData = await res.json()
+      if (res.status === 403) {
+        throw new Error('当前无权限修改，请联系管理员！')
+      }
       if (!res.ok) {
         throw new Error(resData.error || '保存失败')
       }
@@ -144,12 +154,18 @@ export default function BlogTemplatesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('确定要删除这个模板吗？使用该模板的文章将不再套用模板内容。')) return
-    await fetch(`/api/admin/blog-templates/${id}`, { method: 'DELETE' })
-    fetchTemplates()
+    const res = await fetch(`/api/admin/blog-templates/${id}`, { method: 'DELETE' })
+    if (res.status === 403) {
+      showPermissionAlert()
+    } else if (!res.ok) {
+      alert('删除失败，请重试')
+    } else {
+      fetchTemplates()
+    }
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto', fontFamily: 'Outfit, Inter, sans-serif' }}>
+    <div style={{ padding: '2rem', maxWidth: 1400, margin: '0 auto', fontFamily: 'Outfit, Inter, sans-serif' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -178,7 +194,7 @@ export default function BlogTemplatesPage() {
             <thead>
               <tr style={{ background: 'rgba(34,211,238,0.08)' }}>
                 {['模板名称', '页内锚点导航', '推荐配置', '自动链接词数', '创建时间', '操作'].map(h => (
-                  <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -191,29 +207,44 @@ export default function BlogTemplatesPage() {
 
                 return (
                   <tr key={tpl.id} style={{ borderTop: '1px solid rgba(148,163,184,0.1)', background: i % 2 === 0 ? 'transparent' : 'rgba(148,163,184,0.03)', transition: 'background 0.15s' }}>
-                    <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: 'var(--text-primary, #f1f5f9)' }}>
-                      {tpl.name}
+                    <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span>{tpl.name}</span>
+                        {tpl.isDefault && (
+                          <span style={{
+                            padding: '0.15rem 0.4rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 700,
+                            background: 'rgba(34,211,238,0.15)', color: '#22d3ee',
+                          }}>
+                            默认
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td style={{ padding: '0.875rem 1rem' }}>
+                    <td style={{ padding: '0.875rem 1rem', whiteSpace: 'nowrap' }}>
                       <span style={{
                         padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700,
                         background: tpl.anchorNavEnabled ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
                         color: tpl.anchorNavEnabled ? '#10B981' : '#EF4444',
+                        whiteSpace: 'nowrap'
                       }}>
                         {tpl.anchorNavEnabled ? '已启用' : '已禁用'}
                       </span>
                     </td>
-                    <td style={{ padding: '0.875rem 1rem', color: '#f1f5f9' }}>
+                    <td style={{ padding: '0.875rem 1rem', color: '#f1f5f9', whiteSpace: 'nowrap' }}>
                       {tpl.recommendationsType === 'latest' ? '最新文章' : '同分类文章'} ({tpl.recommendationsCount}篇)
                     </td>
-                    <td style={{ padding: '0.875rem 1rem', color: '#22d3ee', fontWeight: 700 }}>
+                    <td style={{ padding: '0.875rem 1rem', color: '#22d3ee', fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {kwCount} 个词
                     </td>
-                    <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
+                    <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                       {new Date(tpl.createdAt).toLocaleString('zh-CN')}
                     </td>
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <td style={{ padding: '0.875rem 1rem', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
+                        <button onClick={() => setPreviewTpl(tpl)} style={{
+                          padding: '0.35rem 0.75rem', borderRadius: 7, border: '1px solid rgba(168,85,247,0.4)',
+                          background: 'rgba(168,85,247,0.1)', color: '#a855f7', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
+                        }}>预览</button>
                         <button onClick={() => openEdit(tpl)} style={{
                           padding: '0.35rem 0.75rem', borderRadius: 7, border: '1px solid rgba(34,211,238,0.4)',
                           background: 'rgba(34,211,238,0.1)', color: '#22d3ee', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
@@ -231,18 +262,29 @@ export default function BlogTemplatesPage() {
           </table>
         </div>
       )}
-
       {/* Modal Form */}
       {showForm && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-        }} onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false) }}>
+        }}>
           <div style={{
             background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 780,
             border: '1px solid rgba(34,211,238,0.2)', boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-            maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box'
+            maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box', position: 'relative'
           }} onClick={e => e.stopPropagation()}>
+            
+            {/* Close button */}
+            <button type="button" onClick={() => setShowForm(false)} style={{
+              position: 'absolute', top: '1.25rem', right: '1.25rem',
+              background: 'transparent', border: 'none', color: '#94a3b8',
+              fontSize: '1.5rem', cursor: 'pointer', outline: 'none',
+              transition: 'color 0.2s',
+            }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+               onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+              &times;
+            </button>
+
             <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 800, color: 'var(--accent-1, #22d3ee)' }}>
               {editingId ? '✏️ 编辑模版' : '＋ 新增文章模板'}
             </h2>
@@ -289,6 +331,12 @@ export default function BlogTemplatesPage() {
                   <input type="checkbox" checked={form.anchorNavEnabled} onChange={e => setForm(f => ({ ...f, anchorNavEnabled: e.target.checked }))}
                     style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#22d3ee' }} />
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f1f5f9' }}>启用页内锚点导航 (ToC)</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={form.isDefault} onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#22d3ee' }} />
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f1f5f9' }}>设为默认模板 (新建文章时默认选择)</span>
                 </label>
 
                 <div>
@@ -349,6 +397,181 @@ export default function BlogTemplatesPage() {
           </div>
         </div>
       )}
+
+      {/* Template Preview Modal */}
+      {previewTpl && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000,
+          display: 'flex', flexDirection: 'column', padding: '2rem', boxSizing: 'border-box'
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '1rem', background: '#1e293b', padding: '1rem 1.5rem', borderRadius: 12,
+            border: '1px solid rgba(34,211,238,0.2)'
+          }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#22d3ee', fontSize: '1.1rem', fontWeight: 800 }}>👁️ 模板效果预览: {previewTpl.name}</h3>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>展示该模板包装的页头 HTML、页尾 HTML 布局排版</p>
+            </div>
+            <button onClick={() => setPreviewTpl(null)} style={{
+              padding: '0.5rem 1.25rem', borderRadius: 8, border: '1px solid rgba(148,163,184,0.25)',
+              background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem'
+            }}>
+              关闭预览
+            </button>
+          </div>
+
+          <div style={{ flex: 1, background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(148,163,184,0.2)' }}>
+            <iframe
+              srcDoc={generateTemplatePreviewHtml(previewTpl.headerContent || '', previewTpl.footerContent || '')}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="Template Live Preview"
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Client-side HTML Template Preview Compiler
+function generateTemplatePreviewHtml(headerContent: string, footerContent: string) {
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Template Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      color: #94a3b8;
+      font-family: Outfit, Inter, sans-serif;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .preview-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 2.5rem;
+      align-items: start;
+    }
+    .article-container {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .article-header {
+      padding: 2.5rem 2.5rem 1.5rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.03) 0%, transparent 100%);
+    }
+    .badge-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.1);
+      color: #22d3ee;
+      border: 1px solid rgba(34, 211, 238, 0.2);
+    }
+    .article-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #f1f5f9;
+      line-height: 1.25;
+      margin: 15px 0 0;
+    }
+    .article-content {
+      padding: 2.5rem;
+      line-height: 1.8;
+      font-size: 1.05rem;
+    }
+    .article-content h2 {
+      color: #f1f5f9;
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-top: 2.5rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.3;
+    }
+    .article-content p {
+      margin-bottom: 1.5rem;
+    }
+    .sidebar-toc {
+      background: rgba(30, 41, 59, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .sidebar-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-top: 0;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      padding-bottom: 0.75rem;
+    }
+    .template-banner {
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px dashed rgba(34, 211, 238, 0.3);
+      background: rgba(34, 211, 238, 0.05);
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <div style="background:rgba(16,185,129,0.15); border:1px solid #10b981; color:#10b981; padding:0.75rem 1rem; border-radius:8px; margin-bottom:1.5rem; font-weight:700; font-size:0.875rem; text-align:center;">
+      📢 正在预览模板效果（正文区域使用示例占位内容展示）
+    </div>
+
+    ${headerContent ? `<div class="template-banner"><b>[页头模板内容]</b><br/>${headerContent}</div>` : ''}
+
+    <div class="detail-grid">
+      <div class="article-container">
+        <div class="article-header">
+          <span class="badge-category">guias</span>
+          <h1 class="article-title">示例文章标题：如何配置您的 IPTV 播放列表</h1>
+        </div>
+        <div class="article-content">
+          <h2>1. 准备配置信息</h2>
+          <p>这是一段占位示例正文。在真实页面中，这里将渲染您文章的具体段落内容。模板的页头 HTML 和页尾 HTML 会分别包裹在正文的上下两侧。</p>
+          <h2>2. 开始导入并播放</h2>
+          <p>测试链接是否有效，通常在第一次加载时可能会有一些网络缓冲，建议使用高速稳定的网络环境。</p>
+        </div>
+      </div>
+
+      <div class="sidebar-toc">
+        <h3 class="sidebar-title">Índice del artículo</h3>
+        <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:0.5rem; font-size:0.85rem;">
+          <li><a href="#" style="color:#22d3ee; text-decoration:none;">1. 准备配置信息</a></li>
+          <li><a href="#" style="color:#94a3b8; text-decoration:none;">2. 开始导入并播放</a></li>
+        </ul>
+      </div>
+    </div>
+
+    ${footerContent ? `<div class="template-banner" style="margin-top: 2rem;"><b>[页尾模板内容]</b><br/>${footerContent}</div>` : ''}
+  </div>
+</body>
+</html>
+  `
 }

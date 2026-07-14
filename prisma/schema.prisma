@@ -12,7 +12,18 @@ model Admin {
   id        String   @id @default(cuid())
   username  String   @unique
   password  String
+  roleId    String?
+  role      Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String   // JSON string of permissions
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  admins      Admin[]
 }
 
 // ── Page Modules (with visibility control) ────────────────────────────────────
@@ -276,6 +287,7 @@ model BlogTemplate {
   headerContent        String     @default("")
   footerContent        String     @default("")
   anchorNavEnabled     Boolean    @default(true)
+  isDefault            Boolean    @default(false)
   recommendationsType  String     @default("latest") // "latest" | "category"
   recommendationsCount Int        @default(3)
   keywordLinks         String     @default("") // JSON map of keyword to URL links
@@ -302,6 +314,9 @@ model BlogPost {
   keywords        String        @default("")
   templateId      String?
   template        BlogTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  anchorNavEnabled Boolean      @default(true)
+  isDeleted       Boolean       @default(false)
+  deletedAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
@@ -309,8 +324,12 @@ model BlogPost {
   @@index([locale, status, publishAt])
 }
 
-
-
-
-
-
+// ── Audit Logs ───────────────────────────────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(cuid())
+  operator  String   // Username of the admin performing the action (e.g., "admin", "editor")
+  action    String   // Action type (e.g., "LOGIN_SUCCESS", "CREATE_ACCOUNT", "UPDATE_ACCOUNT", "DELETE_ACCOUNT", "CREATE_ROLE", "UPDATE_ROLE", "DELETE_ROLE")
+  target    String?  // Name or ID of target account/role affected
+  details   String?  // Additional details (e.g., updated fields, description)
+  createdAt DateTime @default(now())
+}

@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 export async function GET(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-templates', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const templates = await db.blogTemplate.findMany({
     orderBy: { createdAt: 'desc' },
@@ -14,8 +13,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-templates', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const data = await req.json()
   const {
@@ -26,10 +25,17 @@ export async function POST(req: Request) {
     recommendationsType = 'latest',
     recommendationsCount = 3,
     keywordLinks = '',
+    isDefault = false,
   } = data
 
   if (!name) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 })
+  }
+
+  if (Boolean(isDefault)) {
+    await db.blogTemplate.updateMany({
+      data: { isDefault: false }
+    })
   }
 
   const template = await db.blogTemplate.create({
@@ -41,6 +47,7 @@ export async function POST(req: Request) {
       recommendationsType,
       recommendationsCount: Number(recommendationsCount),
       keywordLinks,
+      isDefault: Boolean(isDefault),
     },
   })
   return NextResponse.json(template, { status: 201 })

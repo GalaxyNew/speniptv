@@ -11,13 +11,13 @@ async function main() {
   console.log('🌱 Seeding database...')
 
   // ── Admin account ─────────────────────────────────────────
-  const hashedPassword = await bcrypt.hash('admin123', 12)
+  const hashedPassword = await bcrypt.hash('admin123admin', 12)
   await prisma.admin.upsert({
     where: { username: 'admin' },
-    update: {},
+    update: { password: hashedPassword },
     create: { username: 'admin', password: hashedPassword },
   })
-  console.log('✅ Admin created (username: admin, password: admin123)')
+  console.log('✅ Admin created (username: admin, password: admin123admin)')
 
   // ── Site Settings ─────────────────────────────────────────
   await prisma.siteSettings.upsert({
@@ -793,7 +793,7 @@ async function main() {
   }
 
   console.log('\n🎉 Database seeded successfully!')
-  console.log('   Admin login: admin / admin123')
+  console.log('   Admin login: admin / admin123admin')
 }
 
 main()

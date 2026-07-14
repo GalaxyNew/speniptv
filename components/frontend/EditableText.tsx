@@ -13,6 +13,7 @@ interface EditableTextProps {
   className?: string
   style?: React.CSSProperties
   onSave?: (value: string) => void
+  onPermissionDenied?: () => void
   placeholder?: string
   multiline?: boolean
   noLink?: boolean
@@ -97,6 +98,7 @@ export default function EditableText({
   className,
   style,
   onSave,
+  onPermissionDenied,
   placeholder,
   multiline = false,
   noLink = false,
@@ -283,11 +285,14 @@ export default function EditableText({
     }
 
     startTransition(async () => {
-      await fetch('/api/admin/content', {
+      const res = await fetch('/api/admin/content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moduleId, locale, key: fieldKey, value: finalValue }),
       })
+      if (res.status === 403 && onPermissionDenied) {
+        onPermissionDenied()
+      }
     })
   }
 

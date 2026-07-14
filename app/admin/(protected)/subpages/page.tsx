@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 const LOCALES = ['es']
 
@@ -32,6 +33,7 @@ const emptyForm = {
 }
 
 export default function SubpagesPage() {
+  const { showPermissionAlert } = usePermission()
   const [subpages, setSubpages] = useState<Subpage[]>([])
   const [filterLocale, setFilterLocale] = useState<string>('all')
   const [loading, setLoading] = useState(true)
@@ -95,6 +97,9 @@ export default function SubpagesPage() {
       })
       
       const resData = await res.json()
+      if (res.status === 403) {
+        throw new Error('当前无权限修改，请联系管理员！')
+      }
       if (!res.ok) {
         throw new Error(resData.error || '保存失败')
       }
@@ -110,17 +115,29 @@ export default function SubpagesPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('确定要永久删除这个页面吗？')) return
-    await fetch(`/api/admin/subpages/${id}`, { method: 'DELETE' })
-    fetchSubpages()
+    const res = await fetch(`/api/admin/subpages/${id}`, { method: 'DELETE' })
+    if (res.status === 403) {
+      showPermissionAlert()
+    } else if (!res.ok) {
+      alert('删除失败，请重试')
+    } else {
+      fetchSubpages()
+    }
   }
 
   async function toggleVisible(page: Subpage) {
-    await fetch(`/api/admin/subpages/${page.id}`, {
+    const res = await fetch(`/api/admin/subpages/${page.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isVisible: !page.isVisible }),
     })
-    fetchSubpages()
+    if (res.status === 403) {
+      showPermissionAlert()
+    } else if (!res.ok) {
+      alert('操作失败，请重试')
+    } else {
+      fetchSubpages()
+    }
   }
 
   const localeBadgeColor: Record<string, string> = {
@@ -128,7 +145,7 @@ export default function SubpagesPage() {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: 1400, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import RichTextEditor from '@/components/admin/RichTextEditor'
+import { usePermission } from '@/components/admin/AdminShell'
 
 const LOCALES = ['es']
 const CATEGORIES = [
@@ -13,6 +15,11 @@ const CATEGORIES = [
 interface BlogTemplate {
   id: string
   name: string
+  headerContent?: string
+  footerContent?: string
+  anchorNavEnabled?: boolean
+  keywordLinks?: string
+  isDefault?: boolean
 }
 
 interface BlogPost {
@@ -32,6 +39,7 @@ interface BlogPost {
   keywords: string
   templateId: string | null
   template?: { name: string } | null
+  anchorNavEnabled: boolean
   createdAt: string
   updatedAt: string
 }
@@ -54,6 +62,7 @@ const emptyForm = {
 }
 
 export default function BlogPostsPage() {
+  const { canEdit } = usePermission()
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [templates, setTemplates] = useState<BlogTemplate[]>([])
   const [filterLocale, setFilterLocale] = useState<string>('all')
@@ -61,8 +70,12 @@ export default function BlogPostsPage() {
   const [saving, setSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showSeoModal, setShowSeoModal] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -177,9 +190,11 @@ export default function BlogPostsPage() {
 
   function openAdd() {
     setEditingId(null)
+    const defaultTemplate = templates.find(t => t.isDefault) || templates.find(t => t.name === 'Standard SEO T') || templates[0]
     setForm({
       ...emptyForm,
       publishAt: getLocalDateTimeString(),
+      templateId: defaultTemplate ? defaultTemplate.id : '',
     })
     setError('')
     setShowForm(true)
@@ -221,6 +236,10 @@ export default function BlogPostsPage() {
       setError('文章标题和链接别名 (Slug) 不能为空')
       return
     }
+    if (!form.metaTitle.trim() || !form.metaDescription.trim() || !form.keywords.trim()) {
+      setError('请配置SEO信息')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -240,6 +259,9 @@ export default function BlogPostsPage() {
       })
       
       const resData = await res.json()
+      if (res.status === 403) {
+        throw new Error('当前无权限修改，请联系管理员！')
+      }
       if (!res.ok) {
         throw new Error(resData.error || '保存失败')
       }
@@ -253,10 +275,30 @@ export default function BlogPostsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('确定要永久删除这篇文章吗？此操作不可撤销。')) return
-    await fetch(`/api/admin/blog-posts/${id}`, { method: 'DELETE' })
-    fetchPosts()
+  function handleDelete(id: string, title: string) {
+    setDeleteConfirm({ id, title })
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirm) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/blog-posts/${deleteConfirm.id}`, { method: 'DELETE' })
+      const resData = await res.json()
+      if (res.status === 403) {
+        throw new Error('当前无权限修改，请联系管理员！')
+      }
+      if (!res.ok) {
+        throw new Error(resData.error || '删除失败')
+      }
+      setDeleteConfirm(null)
+      fetchPosts()
+    } catch (err: any) {
+      setError(err.message || '删除发生错误，请重试')
+      setDeleteConfirm(null)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   // Handle HTML import
@@ -356,7 +398,7 @@ export default function BlogPostsPage() {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: 1000, margin: '0 auto', fontFamily: 'Outfit, Inter, sans-serif' }}>
+    <div style={{ padding: '2rem', maxWidth: 1400, margin: '0 auto', fontFamily: 'Outfit, Inter, sans-serif' }}>
       {/* Invisible file input */}
       <input type="file" ref={fileInputRef} onChange={handleHtmlFileChange} accept=".html,.htm" style={{ display: 'none' }} />
 
@@ -375,13 +417,15 @@ export default function BlogPostsPage() {
           }}>
             📄 下载文章模板
           </button>
-          <button onClick={openAdd} style={{
-            background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
-            color: '#fff', border: 'none', borderRadius: 10, padding: '0.625rem 1.25rem',
-            fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
-          }}>
-            ＋ 新建文章
-          </button>
+          {canEdit && (
+            <button onClick={openAdd} style={{
+              background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
+              color: '#fff', border: 'none', borderRadius: 10, padding: '0.625rem 1.25rem',
+              fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'
+            }}>
+              ＋ 新建文章
+            </button>
+          )}
         </div>
       </div>
 
@@ -415,7 +459,7 @@ export default function BlogPostsPage() {
             <thead>
               <tr style={{ background: 'rgba(34,211,238,0.08)' }}>
                 {['文章标题', 'URL 路径', '分类', '模板', '状态', '发布日期', '操作'].map(h => (
-                  <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -430,28 +474,30 @@ export default function BlogPostsPage() {
                       /{post.locale}/blog/{post.slug}
                     </a>
                   </td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#94a3b8', fontSize: '0.85rem' }}>
+                  <td style={{ padding: '0.875rem 1rem', color: '#94a3b8', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                     {getCategoryLabel(post.category)}
                   </td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#a855f7', fontWeight: 600 }}>
+                  <td style={{ padding: '0.875rem 1rem', color: '#a855f7', fontWeight: 600, whiteSpace: 'nowrap' }}>
                     {post.template?.name || '无'}
                   </td>
-                  <td style={{ padding: '0.875rem 1rem' }}>
+                  <td style={{ padding: '0.875rem 1rem', whiteSpace: 'nowrap' }}>
                     {renderStatusBadge(post)}
                   </td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>
+                  <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                     {new Date(post.publishAt).toLocaleString('zh-CN')}
                   </td>
-                  <td style={{ padding: '0.875rem 1rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <td style={{ padding: '0.875rem 1rem', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
                       <button onClick={() => openEdit(post)} style={{
                         padding: '0.35rem 0.75rem', borderRadius: 7, border: '1px solid rgba(34,211,238,0.4)',
                         background: 'rgba(34,211,238,0.1)', color: '#22d3ee', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
-                      }}>编辑</button>
-                      <button onClick={() => handleDelete(post.id)} style={{
-                        padding: '0.35rem 0.75rem', borderRadius: 7, border: '1px solid rgba(239,68,68,0.4)',
-                        background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
-                      }}>删除</button>
+                      }}>{canEdit ? '编辑' : '查看'}</button>
+                      {canEdit && (
+                        <button onClick={() => handleDelete(post.id, post.title)} style={{
+                          padding: '0.35rem 0.75rem', borderRadius: 7, border: '1px solid rgba(239,68,68,0.4)',
+                          background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer'
+                        }}>删除</button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -461,50 +507,115 @@ export default function BlogPostsPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 99999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }} onClick={() => setDeleteConfirm(null)}>
+          <div style={{
+            background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480,
+            border: '1px solid rgba(239,68,68,0.3)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem', textAlign: 'center' }}>🗑️</div>
+            <h3 style={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.75rem', textAlign: 'center' }}>确认删除文章</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '0.5rem', textAlign: 'center' }}>即将永久删除：</p>
+            <p style={{ color: '#f87171', fontWeight: 600, fontSize: '0.95rem', marginBottom: '1.5rem', textAlign: 'center', wordBreak: 'break-all' }}>「{deleteConfirm.title}」</p>
+            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '1.5rem', textAlign: 'center' }}>此操作不可撤销，请谨慎操作。</p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                style={{ padding: '0.6rem 1.5rem', borderRadius: 8, border: '1px solid rgba(148,163,184,0.3)', background: 'rgba(148,163,184,0.1)', color: '#94a3b8', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer' }}
+              >取消</button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                style={{ padding: '0.6rem 1.5rem', borderRadius: 8, border: '1px solid rgba(239,68,68,0.5)', background: 'rgba(239,68,68,0.15)', color: '#f87171', fontWeight: 700, fontSize: '0.9rem', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >{deleting ? '删除中...' : '确认删除'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Form */}
       {showForm && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999,
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
-        }} onClick={(e) => { if (e.target === e.currentTarget) setShowForm(false) }}>
+        }}>
           <div style={{
-            background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 840,
+            background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 1200,
             border: '1px solid rgba(34,211,238,0.2)', boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-            maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box'
+            maxHeight: '92vh', overflowY: 'auto', boxSizing: 'border-box', position: 'relative'
           }} onClick={e => e.stopPropagation()}>
             
+            {/* Close button */}
+            <button type="button" onClick={() => setShowForm(false)} style={{
+              position: 'absolute', top: '1.25rem', right: '1.25rem',
+              background: 'transparent', border: 'none', color: '#94a3b8',
+              fontSize: '1.5rem', cursor: 'pointer', outline: 'none',
+              transition: 'color 0.2s',
+            }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+               onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+              &times;
+            </button>
+
             {/* Form Title & HTML Importer */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 1.5rem', flexWrap: 'wrap', gap: '0.5rem', paddingRight: '2rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 800, color: 'var(--accent-1, #22d3ee)' }}>
-                {editingId ? '✏️ 编辑文章' : '＋ 新建文章'}
+                {editingId ? (canEdit ? '✏️ 编辑文章' : '👁️ 查看文章') : '＋ 新建文章'}
               </h2>
               
-              <button onClick={handleImportHtmlClick} style={{
-                background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)',
-                color: '#10B981', borderRadius: 8, padding: '0.4rem 0.875rem',
-                fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem'
-              }}>
-                📥 导入 HTML 文章
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {canEdit && (
+                  <button onClick={handleImportHtmlClick} style={{
+                    background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)',
+                    color: '#10B981', borderRadius: 8, padding: '0.4rem 0.875rem',
+                    fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem'
+                  }}>
+                    📥 导入 HTML
+                  </button>
+                )}
+                <button onClick={() => setShowSeoModal(true)} style={{
+                  background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)',
+                  color: '#F59E0B', borderRadius: 8, padding: '0.4rem 0.875rem',
+                  fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem'
+                }}>
+                  {canEdit ? '🔍 配置 SEO' : '🔍 查看 SEO'}
+                  {(form.metaTitle || form.metaDescription || form.keywords) ? (
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', marginLeft: 4 }} />
+                  ) : null}
+                </button>
+                <button onClick={() => setShowPreviewModal(true)} style={{
+                  background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.4)',
+                  color: '#22d3ee', borderRadius: 8, padding: '0.4rem 0.875rem',
+                  fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem'
+                }}>
+                  👁️ 预览效果
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem' }}>
+            {/* Metadata Fields Row Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem', marginBottom: '1.5rem', background: 'rgba(15,23,42,0.2)', padding: '1.25rem', borderRadius: 10, border: '1px solid rgba(148,163,184,0.05)' }}>
               
-              {/* Left Column: Post Content */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Col 1: Title & Slug */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>文章标题</label>
                   <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                    disabled={!canEdit}
                     placeholder="例：2025年最佳智能电视IPTV配置" style={{
                       width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                       background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
                       outline: 'none', boxSizing: 'border-box',
                     }} />
                 </div>
-
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>链接别名 (Slug)</label>
                   <input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))}
+                    disabled={!canEdit}
                     placeholder="例：mejor-iptv-smart-tv" style={{
                       width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                       background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
@@ -514,76 +625,73 @@ export default function BlogPostsPage() {
                     预览链接: /{form.locale}/blog/{form.slug.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '-')}
                   </span>
                 </div>
+              </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              {/* Col 2: Locale, Category, Template */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>所属语言</label>
-                    <select value={form.locale} onChange={e => setForm(f => ({ ...f, locale: e.target.value }))} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', cursor: 'pointer',
-                    }}>
+                    <select value={form.locale} onChange={e => setForm(f => ({ ...f, locale: e.target.value }))}
+                      disabled={!canEdit}
+                      style={{
+                        width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                        background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                        outline: 'none', cursor: 'pointer',
+                      }}>
                       {LOCALES.map(l => <option key={l} value={l}>{l.toUpperCase()} – {l === 'fr' ? '法语' : l === 'es' ? '西班牙语' : l === 'en' ? '英语' : '中文'}</option>)}
                     </select>
                   </div>
-
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>分类类别</label>
-                    <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', cursor: 'pointer',
-                    }}>
+                    <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                      disabled={!canEdit}
+                      style={{
+                        width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                        background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                        outline: 'none', cursor: 'pointer',
+                      }}>
                       {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label.zh || c.label.es} ({c.id})</option>)}
                     </select>
                   </div>
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>文章正文内容 (HTML 代码)</label>
-                  <textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-                    placeholder="请输入页面正文，可直接粘贴带有 HTML 排版标记的内容（如从 WordPress/文件导出的 HTML）" rows={12} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'monospace'
-                    }} />
-                </div>
-              </div>
-
-              {/* Right Column: Template, Scheduling & SEO */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(15,23,42,0.2)', padding: '1.25rem', borderRadius: 10, border: '1px solid rgba(148,163,184,0.05)' }}>
-                <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.875rem', fontWeight: 700, color: '#22d3ee' }}>📅 发布与模版套用</h3>
-                
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>套用模板</label>
-                  <select value={form.templateId} onChange={e => setForm(f => ({ ...f, templateId: e.target.value }))} style={{
-                    width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                    background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                    outline: 'none', cursor: 'pointer',
-                  }}>
-                    <option value="">-- 不使用模板 (纯正文展示) --</option>
-                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>发布状态</label>
-                    <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={{
+                  <select value={form.templateId} onChange={e => setForm(f => ({ ...f, templateId: e.target.value }))}
+                    disabled={!canEdit}
+                    style={{
                       width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                       background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
                       outline: 'none', cursor: 'pointer',
                     }}>
-                      <option value="published">立即发布 (Published)</option>
-                      <option value="scheduled">定时发布 (Scheduled)</option>
-                      <option value="draft">暂存草稿 (Draft)</option>
+                    <option value="">-- 不使用模板 (纯正文展示) --</option>
+                    {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Col 3: Excerpt, Status & Scheduling */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: form.status === 'scheduled' ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>发布状态</label>
+                    <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                      disabled={!canEdit}
+                      style={{
+                        width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                        background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                        outline: 'none', cursor: 'pointer',
+                      }}>
+                      <option value="published">立即发布</option>
+                      <option value="scheduled">定时发布</option>
+                      <option value="draft">暂存草稿</option>
                     </select>
                   </div>
-
                   {form.status === 'scheduled' && (
                     <div>
                       <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>计划发布时间</label>
                       <input type="datetime-local" value={form.publishAt} onChange={e => setForm(f => ({ ...f, publishAt: e.target.value }))}
+                        disabled={!canEdit}
                         style={{
                           width: '100%', padding: '0.575rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                           background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
@@ -592,75 +700,29 @@ export default function BlogPostsPage() {
                     </div>
                   )}
                 </div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid rgba(148,163,184,0.1)', margin: '0.5rem 0' }} />
-                <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700, color: '#22d3ee' }}>🔍 SEO 配置与文章参数</h3>
-
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>文章摘要 (Excerpt - 用于列表页)</label>
-                  <textarea value={form.excerpt} onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
-                    placeholder="输入该文章的摘要，用于博客列表的简短呈现（留空则不显示）" rows={2} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', boxSizing: 'border-box', resize: 'none'
-                    }} />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 标题 (Meta Title)</label>
-                  <input value={form.metaTitle} onChange={e => setForm(f => ({ ...f, metaTitle: e.target.value }))}
-                    placeholder="留空则默认使用文章标题" style={{
+                  <input value={form.excerpt} onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
+                    disabled={!canEdit}
+                    placeholder="输入该文章的摘要，用于博客列表的简短呈现（留空则不显示）" style={{
                       width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                       background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
                       outline: 'none', boxSizing: 'border-box',
                     }} />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 描述 (Meta Description)</label>
-                  <textarea value={form.metaDescription} onChange={e => setForm(f => ({ ...f, metaDescription: e.target.value }))}
-                    placeholder="请输入 SEO 页面摘要描述" rows={2} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', boxSizing: 'border-box', resize: 'none'
-                    }} />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 关键词 (多个英文逗号分隔)</label>
-                  <input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))}
-                    placeholder="例如：IPTV España, buy IPTV, lists" style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', boxSizing: 'border-box',
-                    }} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>规范链接 (Canonical)</label>
-                    <input value={form.canonicalUrl} onChange={e => setForm(f => ({ ...f, canonicalUrl: e.target.value }))}
-                      placeholder="留空则自动生成当前链接" style={{
-                        width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                        background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                        outline: 'none', boxSizing: 'border-box',
-                      }} />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>爬虫指令</label>
-                    <select value={form.robots} onChange={e => setForm(f => ({ ...f, robots: e.target.value }))} style={{
-                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', cursor: 'pointer',
-                    }}>
-                      <option value="index, follow">index, follow</option>
-                      <option value="noindex, nofollow">noindex, nofollow</option>
-                      <option value="noindex, follow">noindex, follow</option>
-                    </select>
-                  </div>
                 </div>
               </div>
+
+            </div>
+
+            {/* Bottom Section: Full Width Rich Text Editor */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>文章正文内容</label>
+              <RichTextEditor
+                value={form.content}
+                onChange={val => setForm(f => ({ ...f, content: val }))}
+                readOnly={!canEdit}
+                placeholder="请输入文章正文，支持可视化排版或直接编辑 HTML 源码..."
+              />
             </div>
 
             {error && <p style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '1rem' }}>⚠️ {error}</p>}
@@ -669,19 +731,453 @@ export default function BlogPostsPage() {
               <button onClick={() => setShowForm(false)} style={{
                 padding: '0.625rem 1.25rem', borderRadius: 9, border: '1px solid rgba(148,163,184,0.25)',
                 background: 'transparent', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
-              }}>取消</button>
-              <button onClick={handleSave} disabled={saving} style={{
+              }}>{canEdit ? '取消' : '关闭'}</button>
+              {canEdit && (
+                <button onClick={handleSave} disabled={saving} style={{
+                  padding: '0.625rem 1.5rem', borderRadius: 9, border: 'none',
+                  background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
+                  color: '#fff', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.875rem',
+                  opacity: saving ? 0.7 : 1, transition: 'opacity 0.2s',
+                }}>
+                  {saving ? '保存中…' : '保存'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SEO Modal Popup */}
+      {showSeoModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}>
+          <div style={{
+            background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 520,
+            border: '1px solid rgba(34,211,238,0.2)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+            position: 'relative'
+          }}>
+            <button type="button" onClick={() => setShowSeoModal(false)} style={{
+              position: 'absolute', top: '1.25rem', right: '1.25rem',
+              background: 'transparent', border: 'none', color: '#94a3b8',
+              fontSize: '1.5rem', cursor: 'pointer', outline: 'none',
+              transition: 'color 0.2s',
+            }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+               onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+              &times;
+            </button>
+
+            <h3 style={{ margin: '0 0 1.25rem', color: '#22d3ee', fontSize: '1.1rem', fontWeight: 800 }}>🔍 配置 SEO 属性</h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 标题 (Meta Title)</label>
+                <input value={form.metaTitle} onChange={e => setForm(f => ({ ...f, metaTitle: e.target.value }))}
+                  disabled={!canEdit}
+                  placeholder="留空则默认使用文章标题" style={{
+                    width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                    background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                    outline: 'none', boxSizing: 'border-box',
+                  }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 描述 (Meta Description)</label>
+                <textarea value={form.metaDescription} onChange={e => setForm(f => ({ ...f, metaDescription: e.target.value }))}
+                  disabled={!canEdit}
+                  placeholder="请输入 SEO 页面摘要描述，建议 120-160 字符" rows={3} style={{
+                    width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                    background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                    outline: 'none', boxSizing: 'border-box', resize: 'none'
+                  }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO 关键词 (多个英文逗号分隔)</label>
+                <input value={form.keywords} onChange={e => setForm(f => ({ ...f, keywords: e.target.value }))}
+                  disabled={!canEdit}
+                  placeholder="例如：IPTV España, buy IPTV, lists" style={{
+                    width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                    background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                    outline: 'none', boxSizing: 'border-box',
+                  }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>规范链接 (Canonical URL)</label>
+                  <input value={form.canonicalUrl} onChange={e => setForm(f => ({ ...f, canonicalUrl: e.target.value }))}
+                    disabled={!canEdit}
+                    placeholder="留空则自动生成当前链接" style={{
+                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                      outline: 'none', boxSizing: 'border-box',
+                    }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>爬虫指令 (Robots)</label>
+                  <select value={form.robots} onChange={e => setForm(f => ({ ...f, robots: e.target.value }))}
+                    disabled={!canEdit}
+                    style={{
+                      width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                      outline: 'none', cursor: 'pointer',
+                    }}>
+                    <option value="index, follow">index, follow</option>
+                    <option value="noindex, nofollow">noindex, nofollow</option>
+                    <option value="noindex, follow">noindex, follow</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.75rem' }}>
+              <button onClick={() => setShowSeoModal(false)} style={{
                 padding: '0.625rem 1.5rem', borderRadius: 9, border: 'none',
                 background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
-                color: '#fff', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.875rem',
-                opacity: saving ? 0.7 : 1, transition: 'opacity 0.2s',
+                color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
               }}>
-                {saving ? '保存中…' : '保存'}
+                确定
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Live Preview Modal */}
+      {showPreviewModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000,
+          display: 'flex', flexDirection: 'column', padding: '2rem', boxSizing: 'border-box'
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '1rem', background: '#1e293b', padding: '1rem 1.5rem', borderRadius: 12,
+            border: '1px solid rgba(34,211,238,0.2)'
+          }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#22d3ee', fontSize: '1.1rem', fontWeight: 800 }}>👁️ 文章实时效果预览</h3>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }}>预览页面包含当前套用模板的页头/页尾，自动生成的侧边栏锚点及关键词内链</p>
+            </div>
+            <button onClick={() => setShowPreviewModal(false)} style={{
+              padding: '0.5rem 1.25rem', borderRadius: 8, border: '1px solid rgba(148,163,184,0.25)',
+              background: 'rgba(239,68,68,0.1)', color: '#f87171', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem'
+            }}>
+              关闭预览
+            </button>
+          </div>
+
+          <div style={{ flex: 1, background: '#fff', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(148,163,184,0.2)' }}>
+            <iframe
+              srcDoc={generatePreviewHtml(form, templates)}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="Article Live Preview"
+              sandbox="allow-same-origin allow-scripts"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Client-side HTML Live Preview Compiler
+function generatePreviewHtml(form: typeof emptyForm, templates: BlogTemplate[]) {
+  const selectedTemplate = templates.find(t => t.id === form.templateId)
+  const headerContent = selectedTemplate?.headerContent || ''
+  const footerContent = selectedTemplate?.footerContent || ''
+  const enableToc = selectedTemplate?.anchorNavEnabled ?? false
+  
+  // Keyword links injection helper (simplified for browser preview)
+  let renderedContent = form.content
+  let keywordLinksMap: Record<string, string> = {}
+  if (selectedTemplate?.keywordLinks) {
+    try {
+      keywordLinksMap = JSON.parse(selectedTemplate.keywordLinks)
+    } catch (e) {}
+  }
+  
+  if (Object.keys(keywordLinksMap).length > 0) {
+    const keywords = Object.keys(keywordLinksMap).sort((a, b) => b.length - a.length)
+    const tokens = renderedContent.split(/(<[^>]+>)/g)
+    let insideAnchor = 0
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i]
+      if (token.startsWith('<')) {
+        const lowerTag = token.toLowerCase()
+        if (lowerTag.startsWith('<a ') || lowerTag === '<a>') {
+          insideAnchor++
+        } else if (lowerTag === '</a>') {
+          insideAnchor = Math.max(0, insideAnchor - 1)
+        }
+      } else {
+        if (insideAnchor === 0 && token.trim().length > 0) {
+          let processedText = token
+          for (const kw of keywords) {
+            const url = keywordLinksMap[kw]
+            const escapedKw = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+            const regex = new RegExp(`(${escapedKw})`, 'gi')
+            processedText = processedText.replace(regex, (match) => {
+              return `<a href="${url}" class="keyword-link" style="color:#22d3ee;text-decoration:underline;font-weight:600;">${match}</a>`
+            })
+          }
+          tokens[i] = processedText
+        }
+      }
+    }
+    renderedContent = tokens.join('')
+  }
+
+  // Extract headings for Table of Contents sidebar
+  const toc: { id: string; text: string; level: number }[] = []
+  let headingIndex = 0
+  const tokens = renderedContent.split(/(<[^>]+>)/g)
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (token.startsWith('<')) {
+      const match = token.match(/^<(h2|h3)([^>]*)>$/i)
+      if (match) {
+        const level = parseInt(match[1])
+        const originalAttrs = match[2]
+        let headingText = ''
+        let lookahead = i + 1
+        const closingTag = `</${match[1]}>`.toLowerCase()
+        while (lookahead < tokens.length && tokens[lookahead].toLowerCase() !== closingTag) {
+          headingText += tokens[lookahead]
+          lookahead++
+        }
+        const cleanText = headingText.replace(/<[^>]*>/g, '').trim()
+        if (cleanText) {
+          headingIndex++
+          const id = `heading-${headingIndex}`
+          tokens[i] = `<${match[1]} id="${id}"${originalAttrs}>`
+          toc.push({ id, text: cleanText, level })
+        }
+      }
+    }
+  }
+  renderedContent = tokens.join('')
+  console.log('Preview ToC:', enableToc, toc.length, JSON.stringify(toc))
+
+  // Standalone HTML template for iframe
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Preview: ${form.title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      color: #94a3b8;
+      font-family: Outfit, Inter, sans-serif;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .preview-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+    .breadcrumbs a {
+      color: #22d3ee;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: ${enableToc ? '1fr 280px' : '1fr'};
+      gap: 2.5rem;
+      align-items: start;
+    }
+    .article-container {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .article-header {
+      padding: 2.5rem 2.5rem 1.5rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.03) 0%, transparent 100%);
+    }
+    .badge-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.1);
+      color: #22d3ee;
+      border: 1px solid rgba(34, 211, 238, 0.2);
+    }
+    .article-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #f1f5f9;
+      line-height: 1.25;
+      margin: 15px 0 0;
+    }
+    .article-content {
+      padding: 2.5rem;
+      line-height: 1.8;
+      font-size: 1.05rem;
+    }
+    .article-content h2 {
+      color: #f1f5f9;
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-top: 2.5rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.3;
+    }
+    .article-content h3 {
+      color: #f1f5f9;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      line-height: 1.3;
+    }
+    .article-content p {
+      margin-bottom: 1.5rem;
+    }
+    .article-content a {
+      color: #22d3ee;
+      text-decoration: underline;
+    }
+    .article-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.75rem;
+      margin: 1.5rem 0;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .article-content blockquote {
+      border-left: 4px solid #22d3ee;
+      background: rgba(34, 211, 238, 0.05);
+      padding: 1rem 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 0.5rem 0.5rem 0;
+      font-style: italic;
+    }
+    .article-content ul, .article-content ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    .article-content li {
+      margin-bottom: 0.5rem;
+    }
+    .sidebar-toc {
+      position: sticky;
+      top: 40px;
+      background: rgba(30, 41, 59, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .sidebar-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-top: 0;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      padding-bottom: 0.75rem;
+    }
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .toc-item {
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .toc-link {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .toc-link:hover {
+      color: #22d3ee;
+    }
+    .template-banner {
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px dashed rgba(34, 211, 238, 0.3);
+      background: rgba(34, 211, 238, 0.05);
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <div class="breadcrumbs">
+      <a href="#">Inicio</a>
+      <span>/</span>
+      <a href="#">Blog</a>
+      <span>/</span>
+      <span>${form.title || '无标题文章'}</span>
+    </div>
+
+    ${headerContent ? `<div class="template-banner"><b>[页头模板内容]</b><br/>${headerContent}</div>` : ''}
+
+    <div class="detail-grid">
+      <div class="article-container">
+        <div class="article-header">
+          <span class="badge-category">${form.category}</span>
+          <h1 class="article-title">${form.title || '无标题文章'}</h1>
+        </div>
+        <div class="article-content">
+          ${renderedContent || '<p style="color:#64748b; font-style:italic;">文章正文为空</p>'}
+        </div>
+      </div>
+
+      ${enableToc ? `
+        <div class="sidebar-toc">
+          <h3 class="sidebar-title">Índice del artículo</h3>
+          ${toc.length > 0 ? `
+            <ul class="toc-list">
+              ${toc.map(item => `
+                <li class="toc-item" style="padding-left: ${item.level === 3 ? '1rem' : '0'};">
+                  <a href="#${item.id}" class="toc-link">${item.text}</a>
+                </li>
+              `).join('')}
+            </ul>
+          ` : `
+            <div style="font-size:0.75rem; color:#64748b; font-style:italic; line-height:1.4;">
+              [ToC 导航已启用]<br/>在文章正文内添加 H2 或 H3 标题后将在此处自动生成目录。
+            </div>
+          `}
+        </div>
+      ` : ''}
+    </div>
+
+    ${footerContent ? `<div class="template-banner" style="margin-top: 2rem;"><b>[页尾模板内容]</b><br/>${footerContent}</div>` : ''}
+  </div>
+</body>
+</html>
+  `
 }

@@ -41,3 +41,15 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# SQLite & backups
+*.db
+*.db.bak
+*.db.local.bak
+*.zip
+*.bak*
+temp_deploy_zip
+temp_zip
+/scratch/*.js
+/scratch/*.ts
+/scratch/*.json

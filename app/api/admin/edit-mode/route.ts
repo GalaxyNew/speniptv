@@ -2,15 +2,31 @@ import { NextResponse } from 'next/server'
 import { draftMode } from 'next/headers'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { db } from '@/lib/db'
 
 // GET /api/admin/edit-mode?to=/  — enter edit mode (Next Draft Mode) then redirect.
-// Draft Mode sets the __prerender_bypass cookie, which switches the otherwise
-// statically-cached (ISR) public pages into dynamic rendering *only* for this
-// authenticated editor, leaving the cached version intact for everyone else.
 export async function GET(req: Request) {
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
+  const proto = req.headers.get('x-forwarded-proto') || 'https'
+
+  const settings = await db.siteSettings.findFirst()
+  let baseUrl = ''
+  if (settings?.siteDomain && settings.siteDomain.trim() !== '' && settings.siteDomain !== 'https://example.com') {
+    baseUrl = settings.siteDomain.replace(/\/$/, '')
+  } else if (host) {
+    baseUrl = `${proto}://${host}`
+  } else {
+    try {
+      const parsedUrl = new URL(req.url)
+      baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`
+    } catch {
+      baseUrl = 'http://localhost:3000'
+    }
+  }
+
   const session = await getServerSession(authOptions)
   if (!session) {
-    return NextResponse.redirect(new URL('/admin/login', req.url))
+    return NextResponse.redirect(new URL('/admin/login', baseUrl))
   }
 
   const dm = await draftMode()
@@ -20,7 +36,7 @@ export async function GET(req: Request) {
   const to = searchParams.get('to') || '/'
   // Only allow same-origin relative paths to avoid open-redirects
   const safeTo = to.startsWith('/') && !to.startsWith('//') ? to : '/'
-  return NextResponse.redirect(new URL(safeTo, req.url))
+  return NextResponse.redirect(new URL(safeTo, baseUrl))
 }
 
 // DELETE /api/admin/edit-mode — exit edit mode

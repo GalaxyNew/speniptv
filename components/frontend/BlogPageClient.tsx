@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { publicPath } from '@/lib/seo'
 
@@ -209,6 +209,29 @@ function getReadTime(content: string, locale: string): string {
 export default function BlogPageClient({ locale, settings, posts = [] }: BlogPageClientProps) {
   const [activeCategory, setActiveCategory] = useState('all')
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const cat = params.get('category')
+      if (cat && CATEGORIES.some(c => c.id === cat)) {
+        setActiveCategory(cat)
+      }
+    }
+  }, [])
+
+  const handleCategoryChange = (catId: string) => {
+    setActiveCategory(catId)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      if (catId === 'all') {
+        url.searchParams.delete('category')
+      } else {
+        url.searchParams.set('category', catId)
+      }
+      window.history.pushState({}, '', url.pathname + url.search)
+    }
+  }
+
   const whatsappNumber = (settings?.whatsappNumber || '').replace(/\D/g, '')
   const whatsappMsg = encodeURIComponent(
     locale === 'es' ? 'Hola, me gustaría solicitar una IPTV Prueba gratuita de 24 horas.' :
@@ -414,7 +437,14 @@ export default function BlogPageClient({ locale, settings, posts = [] }: BlogPag
 
                 <div className="featured-text-zone" style={{ padding: '2.5rem 2.5rem 2.5rem 2rem', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '1rem' }}>
                   <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ padding: '0.25rem 0.75rem', borderRadius: 99, fontSize: '0.78rem', fontWeight: 700, background: 'var(--badge-bg)', color: 'var(--badge-text)', border: '1px solid var(--badge-border)' }}>
+                    <span 
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleCategoryChange(featured.category)
+                      }}
+                      style={{ padding: '0.25rem 0.75rem', borderRadius: 99, fontSize: '0.78rem', fontWeight: 700, background: 'var(--badge-bg)', color: 'var(--badge-text)', border: '1px solid var(--badge-border)', cursor: 'pointer' }}
+                    >
                       {featured.categoryLabel}
                     </span>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{formatDate(featured.publishAt, locale)}</span>
@@ -463,7 +493,7 @@ export default function BlogPageClient({ locale, settings, posts = [] }: BlogPag
               <button
                 key={cat.id}
                 className={`blog-cat-chip${activeCategory === cat.id ? ' active' : ''}`}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => handleCategoryChange(cat.id)}
                 style={{ padding: '0.45rem 1.1rem', borderRadius: 99, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 {(cat.label as Record<string, string>)[locale] || cat.label.en}
@@ -500,7 +530,14 @@ export default function BlogPageClient({ locale, settings, posts = [] }: BlogPag
                       {post.emoji}
                     </div>
                     <div style={{ position: 'absolute', top: 12, left: 14 }}>
-                      <span style={{ padding: '0.2rem 0.65rem', borderRadius: 99, fontSize: '0.72rem', fontWeight: 700, background: 'var(--badge-bg)', color: post.accent, border: `1px solid ${post.accent}44` }}>
+                      <span 
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleCategoryChange(post.category)
+                        }}
+                        style={{ padding: '0.2rem 0.65rem', borderRadius: 99, fontSize: '0.72rem', fontWeight: 700, background: 'var(--badge-bg)', color: post.accent, border: `1px solid ${post.accent}44`, cursor: 'pointer' }}
+                      >
                         {post.categoryLabel}
                       </span>
                     </div>

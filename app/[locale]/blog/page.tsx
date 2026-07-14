@@ -177,9 +177,17 @@ export default async function BlogPage({ params }: BlogPageProps) {
   const domain = resolveSiteDomain(settings?.siteDomain)
 
   const now = new Date()
+
+  // Auto-publish past scheduled posts
+  await db.blogPost.updateMany({
+    where: { status: 'scheduled', publishAt: { lte: now } },
+    data: { status: 'published' }
+  })
+
   const dbPosts = await db.blogPost.findMany({
     where: {
       locale,
+      isDeleted: false,
       OR: [
         { status: 'published' },
         { status: 'scheduled', publishAt: { lte: now } }

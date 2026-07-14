@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { usePermission } from '@/components/admin/AdminShell'
 
 const LOCALES = ['fr', 'es', 'en', 'zh']
 
@@ -18,6 +19,7 @@ interface AffiliateLink {
 const emptyForm = { title: '', subtitle: '', url: '', locale: 'fr', sortOrder: 0, isActive: true }
 
 export default function AffiliateLinksPage() {
+  const { showPermissionAlert } = usePermission()
   const [links, setLinks] = useState<AffiliateLink[]>([])
   const [filterLocale, setFilterLocale] = useState<string>('all')
   const [loading, setLoading] = useState(true)
@@ -57,18 +59,28 @@ export default function AffiliateLinksPage() {
     setSaving(true)
     setError('')
     try {
+      let res;
       if (editingId) {
-        await fetch(`/api/admin/affiliate-links/${editingId}`, {
+        res = await fetch(`/api/admin/affiliate-links/${editingId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         })
       } else {
-        await fetch('/api/admin/affiliate-links', {
+        res = await fetch('/api/admin/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         })
+      }
+      if (res.status === 403) {
+        setError('当前无权限修改，请联系管理员！')
+        return
+      }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setError(d.error || '保存失败，请重试')
+        return
       }
       setShowForm(false)
       fetchLinks()
@@ -81,17 +93,29 @@ export default function AffiliateLinksPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('确认删除此推广链接？')) return
-    await fetch(`/api/admin/affiliate-links/${id}`, { method: 'DELETE' })
-    fetchLinks()
+    const res = await fetch(`/api/admin/affiliate-links/${id}`, { method: 'DELETE' })
+    if (res.status === 403) {
+      showPermissionAlert()
+    } else if (!res.ok) {
+      alert('删除失败，请重试')
+    } else {
+      fetchLinks()
+    }
   }
 
   async function toggleActive(link: AffiliateLink) {
-    await fetch(`/api/admin/affiliate-links/${link.id}`, {
+    const res = await fetch(`/api/admin/affiliate-links/${link.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !link.isActive }),
     })
-    fetchLinks()
+    if (res.status === 403) {
+      showPermissionAlert()
+    } else if (!res.ok) {
+      alert('操作失败，请重试')
+    } else {
+      fetchLinks()
+    }
   }
 
   const localeBadgeColor: Record<string, string> = {

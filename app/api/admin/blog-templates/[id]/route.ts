@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { verifyPermission } from '@/lib/permissions'
 
 interface Params { params: Promise<{ id: string }> }
 
 export async function GET(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-templates', 'readonly')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const template = await db.blogTemplate.findUnique({
@@ -21,8 +20,8 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-templates', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const data = await req.json()
@@ -34,11 +33,19 @@ export async function PATCH(req: Request, { params }: Params) {
     recommendationsType,
     recommendationsCount,
     keywordLinks,
+    isDefault,
   } = data
 
   const current = await db.blogTemplate.findUnique({ where: { id } })
   if (!current) {
     return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+  }
+
+  if (isDefault !== undefined && Boolean(isDefault)) {
+    await db.blogTemplate.updateMany({
+      where: { id: { not: id } },
+      data: { isDefault: false }
+    })
   }
 
   const updated = await db.blogTemplate.update({
@@ -51,6 +58,7 @@ export async function PATCH(req: Request, { params }: Params) {
       ...(recommendationsType !== undefined && { recommendationsType }),
       ...(recommendationsCount !== undefined && { recommendationsCount: Number(recommendationsCount) }),
       ...(keywordLinks !== undefined && { keywordLinks }),
+      ...(isDefault !== undefined && { isDefault: Boolean(isDefault) }),
     },
   })
 
@@ -58,8 +66,8 @@ export async function PATCH(req: Request, { params }: Params) {
 }
 
 export async function DELETE(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const permission = await verifyPermission('blog-templates', 'edit')
+  if (!permission.authorized) return NextResponse.json({ error: permission.error }, { status: permission.status })
 
   const { id } = await params
   const current = await db.blogTemplate.findUnique({ where: { id } })

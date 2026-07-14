@@ -6,6 +6,13 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const now = new Date()
+
+  // Auto-publish past scheduled posts
+  await db.blogPost.updateMany({
+    where: { status: 'scheduled', publishAt: { lte: now } },
+    data: { status: 'published' }
+  })
+
   const [settings, subpages, blogPosts] = await Promise.all([
     db.siteSettings.findFirst(),
     db.subpage.findMany({
@@ -15,6 +22,7 @@ export async function GET() {
     db.blogPost.findMany({
       where: {
         locale: 'es',
+        isDeleted: false,
         OR: [
           { status: 'published' },
           { status: 'scheduled', publishAt: { lte: now } }

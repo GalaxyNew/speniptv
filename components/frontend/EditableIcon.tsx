@@ -17,6 +17,7 @@ interface EditableIconProps {
   isEditMode: boolean
   className?: string
   style?: React.CSSProperties
+  onPermissionDenied?: () => void
 }
 
 // Curated list of popular icons by category for quick selection
@@ -51,6 +52,7 @@ export default function EditableIcon({
   isEditMode,
   className,
   style,
+  onPermissionDenied,
 }: EditableIconProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -113,11 +115,16 @@ export default function EditableIcon({
 
     try {
       // Save Icon
-      await fetch('/api/admin/content', {
+      const res1 = await fetch('/api/admin/content', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ moduleId, locale, key: fieldKey, value: finalIcon }),
       })
+      if (res1.status === 403) {
+        setIsOpen(false)
+        onPermissionDenied?.()
+        return
+      }
 
       // Save Icon Size
       await fetch('/api/admin/content', {
