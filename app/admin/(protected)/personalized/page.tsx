@@ -255,7 +255,7 @@ export default function PersonalizedPage() {
             页签上的小图标 (Favicon)
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {settings.faviconUrl ? (
+            {settings.faviconUrl && settings.faviconUrl.trim() !== '' ? (
               <img 
                 src={settings.faviconUrl} 
                 alt="Favicon Preview" 
@@ -301,6 +301,25 @@ export default function PersonalizedPage() {
                 outline: 'none',
               }}
             />
+            {settings.faviconUrl && settings.faviconUrl.trim() !== '' && (
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, faviconUrl: '' }))}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '0.5rem',
+                  color: '#ef4444',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                🗑️ 清除
+              </button>
+            )}
             <label style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -326,7 +345,7 @@ export default function PersonalizedPage() {
             谷歌搜索列表右侧缩略图
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            {settings.googleSearchImageUrl ? (
+            {settings.googleSearchImageUrl && settings.googleSearchImageUrl.trim() !== '' ? (
               <img 
                 src={settings.googleSearchImageUrl} 
                 alt="Google Search Preview" 
@@ -370,6 +389,25 @@ export default function PersonalizedPage() {
                 outline: 'none',
               }}
             />
+            {settings.googleSearchImageUrl && settings.googleSearchImageUrl.trim() !== '' && (
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, googleSearchImageUrl: '' }))}
+                style={{
+                  padding: '0.75rem 1rem',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '0.5rem',
+                  color: '#ef4444',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                🗑️ 清除
+              </button>
+            )}
             <label style={{
               display: 'inline-flex',
               alignItems: 'center',
