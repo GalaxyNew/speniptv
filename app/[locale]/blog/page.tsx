@@ -196,9 +196,33 @@ export default async function BlogPage({ params }: BlogPageProps) {
     orderBy: { publishAt: 'desc' }
   })
 
+  const blogUrl = publicUrl(domain, locale, '/blog')
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: locale === 'es' ? 'Inicio' : locale === 'fr' ? 'Accueil' : locale === 'zh' ? '首页' : 'Home',
+        item: domain
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Blog',
+        item: blogUrl
+      }
+    ]
+  }
+
   return (
     <>
       <BlogSchema locale={locale} settings={settings as Record<string, string> | null} domain={domain} posts={dbPosts} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       <BlogPageClient locale={locale} settings={settings} posts={dbPosts} />
     </>
   )

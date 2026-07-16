@@ -21,6 +21,19 @@ interface FaqSectionClientProps {
 export default function FaqSectionClient({ locale, isEditMode, c, faqs, btnProps }: FaqSectionClientProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(0) // Open first item by default
 
+  const defaultSubtitles: Record<string, string> = {
+    es: "Quedamos a su disposición para cualquier solicitud de información, prioritariamente por WhatsApp o por correo electrónico.",
+    fr: "Nous restons à votre disposition pour toute demande d'information, par WhatsApp en priorité ou par e-mail.",
+    en: "We remain at your disposal for any request for information, by WhatsApp in priority or by email.",
+    zh: "我们随时为您提供任何信息咨询服务，优先通过 WhatsApp 或电子邮件联系我们。"
+  }
+  const defaultBtnTexts: Record<string, string> = {
+    es: "Contáctanos",
+    fr: "Contactez-nous",
+    en: "Contact us",
+    zh: "联系我们"
+  }
+
   const toggleAccordion = (index: number) => {
     setActiveIndex(prev => prev === index ? null : index)
   }
@@ -39,12 +52,12 @@ export default function FaqSectionClient({ locale, isEditMode, c, faqs, btnProps
             </div>
             <h2>
               <EditableText moduleId="faq" locale={locale} fieldKey="title" tag="span" isEditMode={isEditMode}>
-                {c.title ?? 'Vous Avez Encore Des Questions ?'}
+                {c.title ?? (locale === 'es' ? '¿Tienes más preguntas?' : 'Vous Avez Encore Des Questions ?')}
               </EditableText>
             </h2>
             <p>
               <EditableText moduleId="faq" locale={locale} fieldKey="subtitle" tag="span" isEditMode={isEditMode}>
-                {c.subtitle ?? "Nous restons à votre disposition pour toute demande d'information, par WhatsApp en priorité ou par e-mail."}
+                {c.subtitle ?? defaultSubtitles[locale] ?? defaultSubtitles.en}
               </EditableText>
             </p>
             <a
@@ -52,7 +65,7 @@ export default function FaqSectionClient({ locale, isEditMode, c, faqs, btnProps
               className="faq-contact-btn"
             >
               <EditableText moduleId="faq" locale={locale} fieldKey="btn_text" tag="span" isEditMode={isEditMode} noLink={true}>
-                {c.btn_text ?? 'Contactez-nous'}
+                {c.btn_text ?? defaultBtnTexts[locale] ?? defaultBtnTexts.en}
               </EditableText>
               <span style={{ fontSize: '1rem', lineHeight: 1 }}>➔</span>
             </a>

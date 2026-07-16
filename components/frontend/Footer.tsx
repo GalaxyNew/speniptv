@@ -42,9 +42,9 @@ const content = {
     affiliateTitle: 'Nuestros Socios',
     legalTitle: 'Legal',
     legalLinks: [
-      { label: 'política de privacidad', href: '/es/privacy-policy' },
-      { label: 'Condiciones de servicio', href: '/es/terms-of-service' },
-      { label: 'Política de reembolso', href: '/es/refund-policy' },
+      { label: 'política de privacidad', href: '/privacy-policy' },
+      { label: 'Condiciones de servicio', href: '/terms-of-service' },
+      { label: 'Política de reembolso', href: '/refund-policy' },
     ],
   },
   en: {

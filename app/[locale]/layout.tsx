@@ -64,15 +64,15 @@ type Locale = (typeof locales)[number]
 // (Outfit, Inter — referenced across many components) plus the active font are
 // loaded, instead of all ~10 families, to cut render-blocking font weight.
 const FONT_AXIS: Record<string, string> = {
-  'Outfit': 'wght@300;400;500;600;700;800;900',
-  'Inter': 'wght@300;400;500;600;700;800;900',
-  'Poppins': 'wght@300;400;500;600;700;800;900',
-  'Montserrat': 'wght@300;400;500;600;700;800;900',
-  'Space Grotesk': 'wght@300;400;500;600;700',
-  'Playfair Display': 'ital,wght@0,400..900;1,400..900',
-  'Cormorant Garamond': 'ital,wght@0,300..700;1,300..700',
-  'Cinzel': 'wght@400..900',
-  'Syne': 'wght@400..800',
+  'Outfit': 'wght@400;500;600;700;800',
+  'Inter': 'wght@400;500;600;700;800',
+  'Poppins': 'wght@400;500;600;700;800',
+  'Montserrat': 'wght@400;500;600;700;800',
+  'Space Grotesk': 'wght@400;500;600;700',
+  'Playfair Display': 'wght@400;600;700;800',
+  'Cormorant Garamond': 'wght@400;600;700',
+  'Cinzel': 'wght@400;700;800',
+  'Syne': 'wght@400;700;800',
 }
 
 function buildFontHref(activeFont: string): string {
@@ -315,7 +315,7 @@ export default async function LocaleLayout({ params, children }: LocaleLayoutPro
     '@type': 'Product',
     name: schema.orgName || settings?.brandName || 'IPTV Pro',
     image: schema.orgLogoUrl || settings?.brandLogoUrl || undefined,
-    description: settings?.brandSlogan_fr || 'Premium IPTV Subscription service',
+    description: (settings as any)?.[`brandSlogan_${locale}`] || settings?.brandSlogan_fr || 'Premium IPTV Subscription service',
     brand: {
       '@type': 'Brand',
       name: settings?.brandName || 'IPTV Pro'

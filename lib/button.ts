@@ -38,6 +38,8 @@ export function parseButtonValue(rawStr: string | undefined | null): ButtonValue
   }
 }
 
+import { publicPath } from './seo'
+
 export function getButtonLinkProps(
   buttonValueObj: ButtonValue,
   locale: string,
@@ -65,7 +67,8 @@ export function getButtonLinkProps(
   }
 
   if (actionType === 'page') {
-    const href = `/${locale}/${actionTarget.trim().replace(/^\//, '')}`
+    const target = actionTarget.trim().replace(/^\//, '')
+    const href = publicPath(locale, `/${target}`)
     return {
       href,
       target: '_blank'
