@@ -9,6 +9,7 @@ interface AuditLog {
   target: string | null
   details: string | null
   createdAt: string
+  ip: string
 }
 
 interface PaginationInfo {
@@ -351,6 +352,7 @@ export default function LogsPage() {
                   <tr style={{ borderBottom: '1px solid rgba(148,163,184,0.08)', background: 'rgba(30,41,59,0.5)' }}>
                     <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>时间</th>
                     <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>操作人</th>
+                    <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>IP地址</th>
                     <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>操作类型</th>
                     <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>操作目标</th>
                     <th style={{ padding: '1rem', color: '#94a3b8', fontWeight: 700 }}>详情</th>
@@ -364,6 +366,9 @@ export default function LogsPage() {
                       </td>
                       <td style={{ padding: '1rem', fontWeight: 700, color: '#f1f5f9' }}>
                         {log.operator}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                        {log.ip || '-'}
                       </td>
                       <td style={{ padding: '1rem' }}>
                         {renderActionBadge(log.action)}

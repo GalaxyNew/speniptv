@@ -50,6 +50,7 @@ export async function GET(req: Request) {
           { action: { contains: search } },
           { target: { contains: search } },
           { details: { contains: search } },
+          { ip: { contains: search } },
         ],
       })
     }

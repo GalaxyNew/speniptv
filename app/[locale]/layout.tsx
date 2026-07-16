@@ -145,6 +145,14 @@ export async function generateMetadata({
       description: seo?.ogDescription || seo?.metaDescription || fallbackDescription,
       images: seo?.ogImageUrl ? [seo.ogImageUrl] : (settings?.brandLogoUrl ? [settings.brandLogoUrl] : []),
     },
+    icons: {
+      icon: settings?.faviconUrl || '/favicon.ico',
+      shortcut: settings?.faviconUrl || '/favicon.ico',
+      apple: settings?.faviconUrl || '/icon.png',
+    },
+    other: settings?.googleSearchImageUrl ? {
+      thumbnail: settings.googleSearchImageUrl,
+    } : undefined,
   }
 }
 

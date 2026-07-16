@@ -31,6 +31,8 @@ export async function GET(req: Request) {
       showSupportWidget: true,
       googleSiteVerification: '',
       bingSiteVerification: '',
+      faviconUrl: '',
+      googleSearchImageUrl: '',
     }
   }
 

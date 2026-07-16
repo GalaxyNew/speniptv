@@ -41,5 +41,7 @@ export async function getMergedSettings(locale: string) {
     showSupportWidget: localeSettings?.showSupportWidget !== undefined && localeSettings?.showSupportWidget !== null
       ? localeSettings.showSupportWidget
       : globalSettings.showSupportWidget,
+    faviconUrl: localeSettings?.faviconUrl || globalSettings.faviconUrl,
+    googleSearchImageUrl: localeSettings?.googleSearchImageUrl || globalSettings.googleSearchImageUrl,
   }
 }

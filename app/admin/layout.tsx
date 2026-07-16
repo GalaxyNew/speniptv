@@ -1,9 +1,35 @@
 import type { Metadata } from 'next'
 import NextAuthProvider from '@/components/admin/NextAuthProvider'
 
-export const metadata: Metadata = {
-  title: { default: '管理后台', template: '%s | Admin' },
-  robots: 'noindex, nofollow',
+import { db } from '@/lib/db'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await db.siteSettings.findUnique({ where: { id: 'main' } })
+  let favicon = settings?.faviconUrl
+  
+  if (!favicon) {
+    const defaultLocale = settings?.defaultLocale || 'es'
+    const localeSettings = await db.personalizedSettings.findUnique({ where: { locale: defaultLocale } })
+    favicon = localeSettings?.faviconUrl
+  }
+  
+  if (!favicon) {
+    const anySettings = await db.personalizedSettings.findFirst({
+      where: { faviconUrl: { not: '' } }
+    })
+    favicon = anySettings?.faviconUrl
+  }
+  
+  favicon = favicon || '/favicon.ico'
+  return {
+    title: { default: '管理后台', template: '%s | Admin' },
+    robots: 'noindex, nofollow',
+    icons: {
+      icon: favicon,
+      shortcut: favicon,
+      apple: favicon,
+    }
+  }
 }
 
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {

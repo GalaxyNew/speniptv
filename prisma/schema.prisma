@@ -158,6 +158,8 @@ model PersonalizedSettings {
   showSupportWidget      Boolean @default(true)
   googleSiteVerification String @default("")
   bingSiteVerification   String @default("")
+  faviconUrl             String @default("")
+  googleSearchImageUrl   String @default("")
 }
 
 // ── Site Settings (brand, domain, theme, contact) ─────────────────────────────
@@ -200,6 +202,8 @@ model SiteSettings {
   // Search Engine Verification Codes
   googleSiteVerification String @default("")
   bingSiteVerification   String @default("")
+  faviconUrl             String @default("")
+  googleSearchImageUrl   String @default("")
 }
 
 // ── Hero Background Images ───────────────────────────────────────────────────
@@ -331,5 +335,6 @@ model AuditLog {
   action    String   // Action type (e.g., "LOGIN_SUCCESS", "CREATE_ACCOUNT", "UPDATE_ACCOUNT", "DELETE_ACCOUNT", "CREATE_ROLE", "UPDATE_ROLE", "DELETE_ROLE")
   target    String?  // Name or ID of target account/role affected
   details   String?  // Additional details (e.g., updated fields, description)
+  ip        String   @default("")
   createdAt DateTime @default(now())
 }
