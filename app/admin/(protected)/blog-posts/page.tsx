@@ -1074,29 +1074,54 @@ export default function BlogPostsPage() {
               </div>
 
               {selectedDownloadTemplateId && (
-                <div style={{
-                  background: 'rgba(15,23,42,0.4)', borderRadius: 8, padding: '1rem',
-                  border: '1px solid rgba(148,163,184,0.1)', fontSize: '0.85rem', color: '#cbd5e1'
-                }}>
-                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>目录导航 (ToC):</span>
-                    <span style={{ fontWeight: 600, color: templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '#10B981' : '#f87171' }}>
-                      {templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '已启用' : '已禁用'}
-                    </span>
+                <>
+                  <div style={{
+                    background: 'rgba(15,23,42,0.4)', borderRadius: 8, padding: '1rem',
+                    border: '1px solid rgba(148,163,184,0.1)', fontSize: '0.85rem', color: '#cbd5e1'
+                  }}>
+                    <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>目录导航 (ToC):</span>
+                      <span style={{ fontWeight: 600, color: templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '#10B981' : '#f87171' }}>
+                        {templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '已启用' : '已禁用'}
+                      </span>
+                    </div>
+                    <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>页头内容:</span>
+                      <span>
+                        {templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent?.length || 0} 字符` : '无'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#94a3b8' }}>页尾内容:</span>
+                      <span>
+                        {templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent?.length || 0} 字符` : '无'}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>页头内容:</span>
-                    <span>
-                      {templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent?.length || 0} 字符` : '无'}
-                    </span>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>模板下载链接 (供获取/分享)</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input readOnly value={typeof window !== 'undefined' ? `${window.location.origin}/api/admin/blog-templates/${selectedDownloadTemplateId}/download` : ''}
+                        style={{
+                          flex: 1, padding: '0.5rem 0.75rem', borderRadius: 8, fontSize: '0.8rem',
+                          background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#22d3ee',
+                          outline: 'none', textOverflow: 'ellipsis'
+                        }} onClick={e => e.currentTarget.select()} />
+                      <button onClick={() => {
+                        const url = `${window.location.origin}/api/admin/blog-templates/${selectedDownloadTemplateId}/download`
+                        navigator.clipboard.writeText(url)
+                        alert('下载链接已复制到剪贴板！')
+                      }} style={{
+                        padding: '0.5rem 1rem', borderRadius: 8, border: 'none',
+                        background: 'rgba(34,211,238,0.15)', color: '#22d3ee', fontWeight: 700,
+                        cursor: 'pointer', fontSize: '0.8rem', transition: 'all 0.2s',
+                      }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,211,238,0.25)'}
+                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,211,238,0.15)'}>
+                        复制链接
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#94a3b8' }}>页尾内容:</span>
-                    <span>
-                      {templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent?.length || 0} 字符` : '无'}
-                    </span>
-                  </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -1121,7 +1146,7 @@ export default function BlogPostsPage() {
                 background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
                 color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
               }}>
-                确认下载
+                直接下载
               </button>
             </div>
           </div>
