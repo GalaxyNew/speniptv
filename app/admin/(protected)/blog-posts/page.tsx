@@ -72,6 +72,8 @@ export default function BlogPostsPage() {
   const [showForm, setShowForm] = useState(false)
   const [showSeoModal, setShowSeoModal] = useState(false)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [showDownloadModal, setShowDownloadModal] = useState(false)
+  const [selectedDownloadTemplateId, setSelectedDownloadTemplateId] = useState<string>('')
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null)
@@ -79,8 +81,14 @@ export default function BlogPostsPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Download a blank article HTML template matching the importer format
-  function downloadTemplate() {
+  // Download a styled article HTML template matching the importer format and chosen template design
+  function executeDownloadTemplate(templateId: string) {
+    const selectedTemplate = templates.find(t => t.id === templateId)
+    const templateName = selectedTemplate?.name || 'Standard SEO T'
+    const headerContent = selectedTemplate?.headerContent || ''
+    const footerContent = selectedTemplate?.footerContent || ''
+    const enableToc = selectedTemplate?.anchorNavEnabled ?? false
+
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -95,58 +103,232 @@ export default function BlogPostsPage() {
 
   <!-- ✅ SEO 关键词：导入后自动填入「SEO 关键词」字段，多个关键词用英文逗号分隔 -->
   <meta name="keywords" content="关键词1, 关键词2, 关键词3" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      color: #94a3b8;
+      font-family: Outfit, Inter, sans-serif;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .preview-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+    .breadcrumbs a {
+      color: #22d3ee;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: ${enableToc ? '1fr 280px' : '1fr'};
+      gap: 2.5rem;
+      align-items: start;
+    }
+    .article-container {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 1.25rem;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+    }
+    .article-header {
+      padding: 2.5rem 2.5rem 1.5rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.03) 0%, transparent 100%);
+    }
+    .badge-category {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.1);
+      color: #22d3ee;
+      border: 1px solid rgba(34, 211, 238, 0.2);
+    }
+    .article-title {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #f1f5f9;
+      line-height: 1.25;
+      margin: 15px 0 0;
+    }
+    .article-content {
+      padding: 2.5rem;
+      line-height: 1.8;
+      font-size: 1.05rem;
+    }
+    .article-content h2 {
+      color: #f1f5f9;
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-top: 2.5rem;
+      margin-bottom: 1.25rem;
+      line-height: 1.3;
+    }
+    .article-content h3 {
+      color: #f1f5f9;
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+      line-height: 1.3;
+    }
+    .article-content p {
+      margin-bottom: 1.5rem;
+    }
+    .article-content a {
+      color: #22d3ee;
+      text-decoration: underline;
+    }
+    .article-content img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.75rem;
+      margin: 1.5rem 0;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .article-content blockquote {
+      border-left: 4px solid #22d3ee;
+      background: rgba(34, 211, 238, 0.05);
+      padding: 1rem 1.5rem;
+      margin: 1.5rem 0;
+      border-radius: 0 0.5rem 0.5rem 0;
+      font-style: italic;
+    }
+    .article-content ul, .article-content ol {
+      margin-bottom: 1.5rem;
+      padding-left: 1.5rem;
+    }
+    .article-content li {
+      margin-bottom: 0.5rem;
+    }
+    .sidebar-toc {
+      position: sticky;
+      top: 40px;
+      background: rgba(30, 41, 59, 0.35);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+    .sidebar-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #f1f5f9;
+      margin-top: 0;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      padding-bottom: 0.75rem;
+    }
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .toc-item {
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .toc-link {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .toc-link:hover {
+      color: #22d3ee;
+    }
+    .template-banner {
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border: 1px dashed rgba(34, 211, 238, 0.3);
+      background: rgba(34, 211, 238, 0.05);
+      color: #cbd5e1;
+    }
+  </style>
 </head>
 <body>
+  <div class="preview-container">
+    <div style="background:rgba(16,185,129,0.15); border:1px solid #10b981; color:#10b981; padding:0.75rem 1rem; border-radius:8px; margin-bottom:1.5rem; font-weight:700; font-size:0.875rem; text-align:center;">
+      📢 这是一个文章书写模板。请在下方的 &lt;article&gt; 标签内编辑您的文章内容，并在后台导入此 HTML 文件。
+    </div>
 
-  <!-- ✅ 文章正文区域：导入后自动提取 <article> 标签内的全部 HTML 内容 -->
-  <!-- 💡 支持完整的 HTML 标签排版，如 h1~h6、p、ul、ol、table、img、a 等 -->
-  <article>
+    ${headerContent ? `<div class="template-banner"><b>[页头模板内容]</b><br/>${headerContent}</div>` : ''}
 
-    <!-- 文章主标题 -->
-    <h1>在此填写文章主标题</h1>
+    <div class="detail-grid">
+      <div class="article-container">
+        <div class="article-header">
+          <span class="badge-category">guias</span>
+          <h1 class="article-title">在此填写文章主标题</h1>
+        </div>
+        <div class="article-content">
+          <!-- ✅ 文章正文区域：导入后自动提取 <article> 标签内的全部 HTML 内容 -->
+          <!-- 💡 支持完整的 HTML 标签排版，如 h1~h6、p、ul、ol、table、img、a 等 -->
+          <article>
+            <h2 id="heading-1">1. 准备配置信息</h2>
+            <p>在此填写章节正文内容。可以包含多个段落、列表、图片等。</p>
+            <ul>
+              <li>要点一：在此描述</li>
+              <li>要点二：在此描述</li>
+              <li>要点三：在此描述</li>
+            </ul>
 
-    <!-- 引言段落 -->
-    <p>
-      在此填写文章引言或摘要段落。简述文章的主要内容，吸引读者继续阅读。
-    </p>
+            <h2 id="heading-2">2. 开始导入并播放</h2>
+            <p>在此填写第二章节的正文内容。</p>
 
-    <!-- 第一个章节 -->
-    <h2>第一章节标题</h2>
-    <p>
-      在此填写章节正文内容。可以包含多个段落、列表、图片等。
-    </p>
-    <ul>
-      <li>要点一：在此描述</li>
-      <li>要点二：在此描述</li>
-      <li>要点三：在此描述</li>
-    </ul>
+            <h3 id="heading-3">子章节标题</h3>
+            <p>在此填写子章节正文内容。</p>
 
-    <!-- 第二个章节 -->
-    <h2>第二章节标题</h2>
-    <p>
-      在此填写第二章节的正文内容。
-    </p>
+            <h2 id="heading-4">总结</h2>
+            <p>在此填写文章的总结内容，回顾要点，并可加入行动号召（CTA）语句。</p>
+          </article>
+        </div>
+      </div>
 
-    <!-- 子章节 -->
-    <h3>子章节标题</h3>
-    <p>
-      在此填写子章节正文内容。
-    </p>
+      ${enableToc ? `
+      <div class="sidebar-toc">
+        <h3 class="sidebar-title">Índice del artículo</h3>
+        <ul class="toc-list">
+          <li class="toc-item">
+            <a href="#heading-1" class="toc-link">1. 准备配置信息</a>
+          </li>
+          <li class="toc-item">
+            <a href="#heading-2" class="toc-link">2. 开始导入并播放</a>
+          </li>
+          <li class="toc-item" style="padding-left: 1rem;">
+            <a href="#heading-3" class="toc-link">子章节标题</a>
+          </li>
+          <li class="toc-item">
+            <a href="#heading-4" class="toc-link">总结</a>
+          </li>
+        </ul>
+      </div>
+      ` : ''}
+    </div>
 
-    <!-- 第三个章节 -->
-    <h2>第三章节标题</h2>
-    <p>
-      在此填写第三章节的正文内容。可以在此添加更多段落。
-    </p>
-
-    <!-- 结尾总结 -->
-    <h2>总结</h2>
-    <p>
-      在此填写文章的总结内容，回顾要点，并可加入行动号召（CTA）语句。
-    </p>
-
-  </article>
-
+    ${footerContent ? `<div class="template-banner" style="margin-top: 2rem;"><b>[页尾模板内容]</b><br/>${footerContent}</div>` : ''}
+  </div>
 </body>
 </html>`
 
@@ -154,7 +336,7 @@ export default function BlogPostsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'blog-article-template.html'
+    a.download = `blog-template-${templateName.replace(/\s+/g, '-').toLowerCase()}.html`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -409,7 +591,11 @@ export default function BlogPostsPage() {
           <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#94a3b8' }}>撰写、导入及调度你的多语言 Blog 博客文章，支持定时发布与自定义模版套用</p>
         </div>
         <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
-          <button onClick={downloadTemplate} style={{
+          <button onClick={() => {
+            const defaultTemplate = templates.find(t => t.isDefault) || templates.find(t => t.name === 'Standard SEO T') || templates[0]
+            setSelectedDownloadTemplateId(defaultTemplate ? defaultTemplate.id : '')
+            setShowDownloadModal(true)
+          }} style={{
             background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.5)',
             color: '#a855f7', borderRadius: 10, padding: '0.625rem 1.1rem',
             fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
@@ -840,6 +1026,102 @@ export default function BlogPostsPage() {
                 color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
               }}>
                 确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Template Modal Popup */}
+      {showDownloadModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+        }}>
+          <div style={{
+            background: '#1e293b', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 520,
+            border: '1px solid rgba(34,211,238,0.2)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+            position: 'relative', fontFamily: 'Outfit, Inter, sans-serif'
+          }}>
+            <button type="button" onClick={() => setShowDownloadModal(false)} style={{
+              position: 'absolute', top: '1.25rem', right: '1.25rem',
+              background: 'transparent', border: 'none', color: '#94a3b8',
+              fontSize: '1.5rem', cursor: 'pointer', outline: 'none',
+              transition: 'color 0.2s',
+            }} onMouseEnter={e => e.currentTarget.style.color = '#f87171'}
+               onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}>
+              &times;
+            </button>
+
+            <h3 style={{ margin: '0 0 1.25rem', color: '#22d3ee', fontSize: '1.1rem', fontWeight: 800 }}>📄 选择下载模板</h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>选择模板样式</label>
+                <select value={selectedDownloadTemplateId} onChange={e => setSelectedDownloadTemplateId(e.target.value)}
+                  style={{
+                    width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                    background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                    outline: 'none', cursor: 'pointer',
+                  }}>
+                  <option value="">-- 选择模板 --</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.isDefault ? ' (默认)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedDownloadTemplateId && (
+                <div style={{
+                  background: 'rgba(15,23,42,0.4)', borderRadius: 8, padding: '1rem',
+                  border: '1px solid rgba(148,163,184,0.1)', fontSize: '0.85rem', color: '#cbd5e1'
+                }}>
+                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>目录导航 (ToC):</span>
+                    <span style={{ fontWeight: 600, color: templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '#10B981' : '#f87171' }}>
+                      {templates.find(t => t.id === selectedDownloadTemplateId)?.anchorNavEnabled ? '已启用' : '已禁用'}
+                    </span>
+                  </div>
+                  <div style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>页头内容:</span>
+                    <span>
+                      {templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.headerContent?.length || 0} 字符` : '无'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#94a3b8' }}>页尾内容:</span>
+                    <span>
+                      {templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent ? `${templates.find(t => t.id === selectedDownloadTemplateId)?.footerContent?.length || 0} 字符` : '无'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.75rem' }}>
+              <button onClick={() => setShowDownloadModal(false)} style={{
+                padding: '0.625rem 1.25rem', borderRadius: 9, border: '1px solid rgba(148,163,184,0.2)',
+                background: 'transparent', color: '#94a3b8', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
+                transition: 'all 0.2s',
+              }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#fff'; }}
+                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}>
+                取消
+              </button>
+              <button onClick={() => {
+                if (selectedDownloadTemplateId) {
+                  executeDownloadTemplate(selectedDownloadTemplateId)
+                  setShowDownloadModal(false)
+                } else {
+                  alert('请先选择一个模板')
+                }
+              }} style={{
+                padding: '0.625rem 1.5rem', borderRadius: 9, border: 'none',
+                background: 'var(--accent-gradient, linear-gradient(90deg,#22d3ee,#a855f7))',
+                color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.875rem',
+              }}>
+                确认下载
               </button>
             </div>
           </div>
