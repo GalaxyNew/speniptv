@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { parseButtonValue, getButtonLinkProps } from '@/lib/button'
 
@@ -43,6 +43,7 @@ const ctaLabels = { fr: 'Essai Gratuit', es: 'Prueba', en: 'Free Trial', zh: '�
 
 export default function NavBar({ locale, settings, isEditMode, links: propLinks, headerContent }: NavBarProps) {
   const pathname = usePathname() || ''
+  const router = useRouter()
   const isSubpage = pathname !== '/' && !/^\/(fr|es|en|zh)\/?$/.test(pathname)
   const isBlogPage = pathname === '/blog' || pathname.startsWith('/blog/') || /^\/(fr|es|en|zh)\/blog(\/|$)/.test(pathname)
   const backLabels = { fr: 'Retour', es: 'Volver', en: 'Back', zh: '返回上一页' }
@@ -134,6 +135,107 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href?: string) => {
+    const targetHref = href || e.currentTarget.getAttribute('href') || ''
+    if (!targetHref) return
+
+    // 1. If it's a pure anchor on the current page
+    if (targetHref.startsWith('#')) {
+      const targetId = targetHref.substring(1)
+      const element = document.getElementById(targetId)
+      if (element) {
+        e.preventDefault()
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+      return
+    }
+
+    // 2. If it contains a '#' (e.g. '/#pricing' or '/es#pricing')
+    if (targetHref.includes('#')) {
+      const [urlPath, hash] = targetHref.split('#')
+      
+      // Normalize current path and target path to compare them
+      const normalizePath = (p: string) => p.replace(/\/$/, '') || '/'
+      const currentNorm = normalizePath(pathname)
+      const targetNorm = normalizePath(urlPath)
+      
+      // Treat locale roots (e.g. '/es', '/fr', etc.) as equivalent to '/' (or home page)
+      const isHomePath = (p: string) => p === '/' || /^\/(fr|es|en|zh)$/.test(p)
+      
+      const isSamePage = currentNorm === targetNorm || (isHomePath(currentNorm) && isHomePath(targetNorm))
+      
+      if (isSamePage) {
+        const element = document.getElementById(hash)
+        if (element) {
+          e.preventDefault()
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+      } else {
+        // Cross-page navigation: intercept, store scroll target in sessionStorage, and navigate without hash!
+        e.preventDefault()
+        try {
+          sessionStorage.setItem('scrollTarget', hash)
+        } catch (err) {
+          console.error(err)
+        }
+        router.push(urlPath)
+      }
+    }
+  }
+
+  useEffect(() => {
+    // 1. Check for sessionStorage scroll target
+    try {
+      const scrollTarget = sessionStorage.getItem('scrollTarget')
+      if (scrollTarget) {
+        sessionStorage.removeItem('scrollTarget')
+        const scrollToElement = () => {
+          const element = document.getElementById(scrollTarget)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth' })
+            return true
+          }
+          return false
+        }
+        if (!scrollToElement()) {
+          const timer = setTimeout(scrollToElement, 150)
+          return () => clearTimeout(timer)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+
+    // 2. Fallback in case they access the page directly with hash in the URL (e.g. external link)
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.substring(1)
+      
+      try {
+        window.history.replaceState(
+          null,
+          document.title,
+          window.location.pathname + window.location.search
+        )
+      } catch (err) {
+        console.error('Failed to replace hash:', err)
+      }
+
+      const scrollToElement = () => {
+        const element = document.getElementById(hash)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+          return true
+        }
+        return false
+      }
+
+      if (!scrollToElement()) {
+        const timer = setTimeout(scrollToElement, 150)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [pathname])
+
   return (
     <nav
       className={`${scrolled ? 'scrolled-nav' : ''} ${useLightNav ? 'subpage-nav' : 'home-nav'}`}
@@ -215,6 +317,7 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
               href={link.href}
               target={link.target}
               rel={link.rel}
+              onClick={(e) => handleAnchorClick(e, link.href)}
               style={{
                 color: 'var(--nav-link)',
                 textDecoration: 'none',
@@ -242,6 +345,7 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
                     href={isSubpage && ctaProps.href?.startsWith('#') ? (homePath === '/' ? `/${ctaProps.href}` : `${homePath}${ctaProps.href}`) : ctaProps.href}
                     target={ctaProps.target}
                     rel={ctaProps.rel}
+                    onClick={handleAnchorClick}
                     className="btn-primary"
                     style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}
                   >
@@ -250,6 +354,7 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
                 ) : (
                   <a
                     href={isSubpage ? (homePath === '/' ? '/#trial_cta' : `${homePath}#trial_cta`) : '#trial_cta'}
+                    onClick={handleAnchorClick}
                     className="btn-primary"
                     style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}
                   >
@@ -288,6 +393,7 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
                   href={isSubpage && ctaProps.href?.startsWith('#') ? (homePath === '/' ? `/${ctaProps.href}` : `${homePath}${ctaProps.href}`) : ctaProps.href}
                   target={ctaProps.target}
                   rel={ctaProps.rel}
+                  onClick={handleAnchorClick}
                   className="btn-primary"
                   style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}
                 >
@@ -296,6 +402,7 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
               ) : (
                 <a
                   href={isSubpage ? (homePath === '/' ? '/#trial_cta' : `${homePath}#trial_cta`) : '#trial_cta'}
+                  onClick={handleAnchorClick}
                   className="btn-primary"
                   style={{ padding: '0.5rem 1.25rem', fontSize: '0.875rem' }}
                 >
@@ -334,7 +441,10 @@ export default function NavBar({ locale, settings, isEditMode, links: propLinks,
               href={link.href}
               target={link.target}
               rel={link.rel}
-              onClick={() => setMenuOpen(false)}
+              onClick={(e) => {
+                setMenuOpen(false)
+                handleAnchorClick(e, link.href)
+              }}
               style={{
                 color: useLightNav ? 'var(--text-primary)' : '#ffffff',
                 textDecoration: 'none',

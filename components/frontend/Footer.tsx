@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { parseButtonValue, getButtonLinkProps } from '@/lib/button'
 
 interface FooterProps {
@@ -84,6 +85,8 @@ const content = {
 }
 
 export default function Footer({ locale, settings, isEditMode, footerContent, navLinks }: FooterProps) {
+  const pathname = usePathname() || ''
+  const router = useRouter()
   const loc = locale as keyof typeof content
   const d = content[loc] ?? content.en
   const year = new Date().getFullYear()
@@ -102,6 +105,54 @@ export default function Footer({ locale, settings, isEditMode, footerContent, na
             : `https://t.me/${rawTelegramUrl.replace('@', '')}`))
     : ''
   const email = settings?.contactEmail ?? ''
+
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href?: string) => {
+    const targetHref = href || e.currentTarget.getAttribute('href') || ''
+    if (!targetHref) return
+
+    // 1. If it's a pure anchor on the current page
+    if (targetHref.startsWith('#')) {
+      const targetId = targetHref.substring(1)
+      const element = document.getElementById(targetId)
+      if (element) {
+        e.preventDefault()
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+      return
+    }
+
+    // 2. If it contains a '#' (e.g. '/#pricing' or '/es#pricing')
+    if (targetHref.includes('#')) {
+      const [urlPath, hash] = targetHref.split('#')
+      
+      // Normalize current path and target path to compare them
+      const normalizePath = (p: string) => p.replace(/\/$/, '') || '/'
+      const currentNorm = normalizePath(pathname)
+      const targetNorm = normalizePath(urlPath)
+      
+      // Treat locale roots (e.g. '/es', '/fr', etc.) as equivalent to '/' (or home page)
+      const isHomePath = (p: string) => p === '/' || /^\/(fr|es|en|zh)$/.test(p)
+      
+      const isSamePage = currentNorm === targetNorm || (isHomePath(currentNorm) && isHomePath(targetNorm))
+      
+      if (isSamePage) {
+        const element = document.getElementById(hash)
+        if (element) {
+          e.preventDefault()
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+      } else {
+        // Cross-page navigation: intercept, store scroll target in sessionStorage, and navigate without hash!
+        e.preventDefault()
+        try {
+          sessionStorage.setItem('scrollTarget', hash)
+        } catch (err) {
+          console.error(err)
+        }
+        router.push(urlPath)
+      }
+    }
+  }
 
   const copyright = (settings?.footerCopyright ?? '© {year} {brand}. All rights reserved.')
     .replace('{year}', String(year))
@@ -173,7 +224,7 @@ export default function Footer({ locale, settings, isEditMode, footerContent, na
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.625rem', padding: 0, margin: 0 }}>
               {footerNavLinks.map((link: any, i) => (
                 <li key={i}>
-                  <a href={link.href} target={link.target} rel={link.rel} style={{ color: 'var(--footer-text)', textDecoration: 'none', fontSize: '0.9rem', transition: 'color 0.2s' }}
+                  <a href={link.href} target={link.target} rel={link.rel} onClick={(e) => handleAnchorClick(e, link.href)} style={{ color: 'var(--footer-text)', textDecoration: 'none', fontSize: '0.9rem', transition: 'color 0.2s' }}
                     onMouseEnter={(e: any) => e.target.style.color = 'var(--accent-1)'}
                     onMouseLeave={(e: any) => e.target.style.color = 'var(--footer-text)'}
                   >
