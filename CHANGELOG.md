@@ -2,6 +2,7 @@
 
 ## 2026-07-20 - Fix TOC Sidebar DOM Hydration Crash
 - BlogTocSidebar.tsx: Wrap conditional/sibling text nodes inside a span container to prevent React NotFoundError crashes under browser translation/hydration mismatch.
+- page.tsx: Fallback to post.anchorNavEnabled when no template is associated, ensuring Table of Contents sidebar renders correctly.
 
 ## 2026-07-11 - SEO P0 Meta/Title/Redirect Fix
 - 修复 PageSeo.es metaDescription 脏前缀 `Description：`

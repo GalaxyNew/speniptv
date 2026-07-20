@@ -286,7 +286,7 @@ export default async function BlogPostDetailPage({ params }: SubpageProps) {
   renderedContent = injectKeywordLinks(renderedContent, keywordLinksMap)
 
   // Anchor generation & Table of Contents extraction
-  const enableToc = post.template?.anchorNavEnabled ?? false
+  const enableToc = post.template ? post.template.anchorNavEnabled : post.anchorNavEnabled
   const { processedHtml, toc } = processAnchorsAndExtractToc(renderedContent)
   renderedContent = processedHtml
 
