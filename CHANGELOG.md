@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-20 - Fix TOC Sidebar DOM Hydration Crash
+- BlogTocSidebar.tsx: Wrap conditional/sibling text nodes inside a span container to prevent React NotFoundError crashes under browser translation/hydration mismatch.
+
 ## 2026-07-11 - SEO P0 Meta/Title/Redirect Fix
 - 修复 PageSeo.es metaDescription 脏前缀 `Description：`
 - 补齐 3 篇西语博客缺失 metaDescription

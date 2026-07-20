@@ -136,7 +136,7 @@ export default function BlogTocSidebar({ toc, titleLabel = 'Indice' }: BlogTocSi
                   }}
                 >
                   {isActive && <span style={{ marginRight: '0.4rem', color: 'var(--accent-1, #22d3ee)' }}>✦</span>}
-                  {item.text}
+                  <span>{item.text}</span>
                 </a>
               </li>
             )
@@ -273,7 +273,7 @@ export default function BlogTocSidebar({ toc, titleLabel = 'Indice' }: BlogTocSi
                   }}
                 >
                   {isActive && <span style={{ marginRight: '0.4rem', color: '#22d3ee' }}>✦</span>}
-                  {item.text}
+                  <span>{item.text}</span>
                 </a>
               </li>
             )
