@@ -53,6 +53,7 @@ const emptyForm = {
   category: 'guias',
   status: 'published',
   publishAt: '', // Date string
+  updatedAt: '', // Date string
   metaTitle: '',
   metaDescription: '',
   canonicalUrl: '',
@@ -373,9 +374,11 @@ export default function BlogPostsPage() {
   function openAdd() {
     setEditingId(null)
     const defaultTemplate = templates.find(t => t.isDefault) || templates.find(t => t.name === 'Standard SEO T') || templates[0]
+    const nowLocal = getLocalDateTimeString()
     setForm({
       ...emptyForm,
-      publishAt: getLocalDateTimeString(),
+      publishAt: nowLocal,
+      updatedAt: nowLocal,
       templateId: defaultTemplate ? defaultTemplate.id : '',
     })
     setError('')
@@ -402,6 +405,7 @@ export default function BlogPostsPage() {
       category: post.category,
       status: post.status,
       publishAt: localPublishAt,
+      updatedAt: getLocalDateTimeString(), // Default to current time when opening edit
       metaTitle: post.metaTitle || '',
       metaDescription: post.metaDescription || '',
       canonicalUrl: post.canonicalUrl || '',
@@ -431,7 +435,8 @@ export default function BlogPostsPage() {
       const payload = {
         ...form,
         templateId: form.templateId === '' ? null : form.templateId,
-        publishAt: form.status === 'scheduled' ? new Date(form.publishAt).toISOString() : new Date().toISOString(),
+        publishAt: form.publishAt ? new Date(form.publishAt).toISOString() : new Date().toISOString(),
+        updatedAt: form.updatedAt ? new Date(form.updatedAt).toISOString() : new Date().toISOString(),
       }
 
       const res = await fetch(url, {
@@ -644,7 +649,7 @@ export default function BlogPostsPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: 'rgba(34,211,238,0.08)' }}>
-                {['文章标题', 'URL 路径', '分类', '模板', '状态', '发布日期', '操作'].map(h => (
+                {['文章标题', 'URL 路径', '分类', '模板', '状态', '发布时间', '修改时间', '操作'].map(h => (
                   <th key={h} style={{ padding: '0.875rem 1rem', textAlign: 'left', fontWeight: 700, color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -671,6 +676,9 @@ export default function BlogPostsPage() {
                   </td>
                   <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
                     {new Date(post.publishAt).toLocaleString('zh-CN')}
+                  </td>
+                  <td style={{ padding: '0.875rem 1rem', color: '#38bdf8', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                    {post.updatedAt ? new Date(post.updatedAt).toLocaleString('zh-CN') : '-'}
                   </td>
                   <td style={{ padding: '0.875rem 1rem', whiteSpace: 'nowrap' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
@@ -856,9 +864,9 @@ export default function BlogPostsPage() {
                 </div>
               </div>
 
-              {/* Col 3: Excerpt, Status & Scheduling */}
+              {/* Col 3: Excerpt, Status, Dates & Scheduling */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: form.status === 'scheduled' ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>发布状态</label>
                     <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
@@ -868,32 +876,45 @@ export default function BlogPostsPage() {
                         background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
                         outline: 'none', cursor: 'pointer',
                       }}>
-                      <option value="published">立即发布</option>
+                      <option value="published">已发布 / 立即发布</option>
                       <option value="scheduled">定时发布</option>
                       <option value="draft">暂存草稿</option>
                     </select>
                   </div>
-                  {form.status === 'scheduled' && (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>计划发布时间</label>
-                      <input type="datetime-local" value={form.publishAt} onChange={e => setForm(f => ({ ...f, publishAt: e.target.value }))}
-                        disabled={!canEdit}
-                        style={{
-                          width: '100%', padding: '0.575rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
-                          background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                          outline: 'none', boxSizing: 'border-box',
-                        }} />
-                    </div>
-                  )}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      {form.status === 'scheduled' ? '计划发布时间' : '文章发布时间'}
+                    </label>
+                    <input type="datetime-local" value={form.publishAt} onChange={e => setForm(f => ({ ...f, publishAt: e.target.value }))}
+                      disabled={!canEdit}
+                      style={{
+                        width: '100%', padding: '0.575rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                        background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
+                        outline: 'none', boxSizing: 'border-box',
+                      }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    最后修改时间 (打开时默认为当前时间，也可手动修改)
+                  </label>
+                  <input type="datetime-local" value={form.updatedAt} onChange={e => setForm(f => ({ ...f, updatedAt: e.target.value }))}
+                    disabled={!canEdit}
+                    style={{
+                      width: '100%', padding: '0.575rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
+                      background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#38bdf8',
+                      outline: 'none', boxSizing: 'border-box',
+                    }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>文章摘要 (Excerpt - 用于列表页)</label>
-                  <input value={form.excerpt} onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
+                  <textarea value={form.excerpt} onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))}
                     disabled={!canEdit}
+                    rows={3}
                     placeholder="输入该文章的摘要，用于博客列表的简短呈现（留空则不显示）" style={{
                       width: '100%', padding: '0.625rem 0.875rem', borderRadius: 8, fontSize: '0.9rem',
                       background: 'rgba(15,23,42,0.8)', border: '1px solid rgba(148,163,184,0.2)', color: '#f1f5f9',
-                      outline: 'none', boxSizing: 'border-box',
+                      outline: 'none', boxSizing: 'border-box', resize: 'vertical',
                     }} />
                 </div>
               </div>

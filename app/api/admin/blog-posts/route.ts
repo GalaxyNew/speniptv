@@ -43,10 +43,12 @@ export async function POST(req: Request) {
     title,
     slug,
     locale,
+    excerpt = '',
     content,
     category,
     status = 'published',
     publishAt,
+    updatedAt,
     metaTitle = '',
     metaDescription = '',
     canonicalUrl = '',
@@ -78,16 +80,19 @@ export async function POST(req: Request) {
   }
 
   const parsedPublishAt = publishAt ? new Date(publishAt) : new Date()
+  const parsedUpdatedAt = updatedAt ? new Date(updatedAt) : new Date()
 
   const post = await db.blogPost.create({
     data: {
       title,
       slug: formattedSlug,
       locale,
+      excerpt,
       content,
       category,
       status,
       publishAt: parsedPublishAt,
+      updatedAt: parsedUpdatedAt,
       metaTitle,
       metaDescription,
       canonicalUrl,

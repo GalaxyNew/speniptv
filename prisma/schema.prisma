@@ -204,6 +204,8 @@ model SiteSettings {
   bingSiteVerification   String @default("")
   faviconUrl             String @default("")
   googleSearchImageUrl   String @default("")
+  // API Publishing Key
+  apiKey                 String @default("igortv-api-secret-key-2026")
 }
 
 // ── Hero Background Images ───────────────────────────────────────────────────

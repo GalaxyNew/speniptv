@@ -71,7 +71,7 @@ conn.on('ready', async () => {
     console.log('--- Step 2: Extracting files ---');
     try {
       await executeCommand(conn, `unzip -o ${remoteZipPath} -d ${appDir}`);
-      await executeCommand(conn, `rm -f ${appDir}/app/favicon.ico ${appDir}/app/icon.png`);
+      await executeCommand(conn, `rm -rf ${appDir}/app/api/posts ${appDir}/app/favicon.ico ${appDir}/app/icon.png`);
     } catch (unzipErr) {
       console.log('Unzip returned a warning/exit code (likely path separator warnings). Continuing...');
     }

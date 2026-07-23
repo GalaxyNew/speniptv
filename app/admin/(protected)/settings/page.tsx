@@ -232,6 +232,57 @@ export default function SettingsPage() {
         {field('contactEmail', '全局默认联系邮箱')}
       </section>
 
+      {/* API Publishing Key */}
+      <section style={{ marginBottom: '2rem', padding: '1.25rem', background: 'rgba(30,41,59,0.5)', borderRadius: '0.75rem', border: '1px solid rgba(148,163,184,0.08)' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', marginBottom: '0.5rem' }}>🔑 API 发布密钥设置 (X-API-Key)</h2>
+        <p style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '1rem', lineHeight: 1.4 }}>
+          技术人员或外部自动化脚本在通过 REST API 发布文章、上传图片时，需在 HTTP 请求头中传入此 `X-API-Key` 认证密钥。
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <input
+              type="text"
+              value={settings.apiKey ?? ''}
+              onChange={e => setSettings(prev => ({ ...prev, apiKey: e.target.value }))}
+              placeholder="igortv-api-secret-key-2026"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                background: 'rgba(15,23,42,0.8)',
+                border: '1px solid rgba(148,163,184,0.2)',
+                borderRadius: '0.5rem',
+                color: '#22d3ee',
+                fontFamily: 'monospace',
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const randKey = 'key_' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+              setSettings(prev => ({ ...prev, apiKey: randKey }))
+            }}
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(148,163,184,0.2)',
+              borderRadius: '0.5rem',
+              color: '#94a3b8',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            🎲 随机生成
+          </button>
+        </div>
+      </section>
+
       {/* Code Injection */}
       <section style={{ marginBottom: '2rem', padding: '1.25rem', background: 'rgba(30,41,59,0.5)', borderRadius: '0.75rem', border: '1px solid rgba(148,163,184,0.08)' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', marginBottom: '1rem' }}>💻 HTML 代码注入 (全局)</h2>
